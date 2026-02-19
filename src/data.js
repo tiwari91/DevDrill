@@ -3433,4 +3433,524 @@ export const INTERVIEW_QUESTIONS = [
     answer: "Redis Sorted Sets are ideal: ZADD updates a player's score in O(log N), ZREVRANGE gets top-K in O(log N + K), ZREVRANK gets a player's rank in O(log N). For millions of players, Redis handles this in-memory with sub-millisecond latency. Persist to DB periodically for durability. For global + friend leaderboards: global = one sorted set, friend = compute on read by fetching friend scores. Sharding: partition by region or game mode if needed.",
     tips: "Discuss daily/weekly/all-time boards (separate sorted sets with TTL), and how to handle ties (secondary sort by timestamp)."
   },
+  {
+    id: 261, topic: "System Design", difficulty: "medium",
+    scenario: "What is Event Sourcing?",
+    options: [
+      "A pattern where you log errors from events to a central monitoring system",
+      "A pattern that stores all changes to application state as a sequence of immutable events, rather than storing current state directly",
+      "A technique for sourcing events from third-party APIs",
+      "A method for broadcasting events to all microservices simultaneously"
+    ],
+    correctOption: 1,
+    answer: "Instead of storing current state (e.g., account balance = $500), store every event that led to it (deposited $1000, withdrew $200, deposited $100, withdrew $400). Current state is derived by replaying events. Benefits: complete audit trail, time-travel debugging, rebuild read models from events. Trade-offs: storage grows over time (use snapshots), eventual consistency, increased complexity.",
+    tips: "Often paired with CQRS. Used by banks, e-commerce (order history), and version control systems (git is event sourcing)."
+  },
+  {
+    id: 262, topic: "System Design", difficulty: "easy",
+    scenario: "What is a Proxy Server?",
+    options: [
+      "A server that stores backup copies of production databases",
+      "An intermediary server that sits between a client and the destination server, forwarding requests on behalf of the client",
+      "A testing server that simulates production environments",
+      "A server that converts HTTP to HTTPS"
+    ],
+    correctOption: 1,
+    answer: "A proxy server acts as an intermediary. Forward proxy: sits in front of clients, hides client identity (used for privacy, content filtering, bypassing restrictions). Reverse proxy: sits in front of servers, hides server identity (used for load balancing, caching, security). Both can cache responses, filter content, and log traffic.",
+    tips: "VPNs use forward proxies. NGINX/Cloudflare use reverse proxies. Know the difference in interviews."
+  },
+  {
+    id: 263, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a web crawler like Googlebot?",
+    options: [
+      "Open a browser tab for each URL and manually save the HTML",
+      "Use a distributed system with a URL frontier (priority queue), fetcher workers, content parser, URL deduplication (Bloom filter), and a politeness policy (robots.txt + rate limiting per domain)",
+      "Write a single-threaded script that recursively follows links",
+      "Use an iframe to load each page and extract its content"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Seed URLs — starting points, (2) URL Frontier — priority queue (BFS) with per-domain queues for politeness, (3) DNS resolver — with caching, (4) Fetcher workers — distributed HTTP clients, (5) Content parser — extract links, text, metadata, (6) URL deduplication — Bloom filter to avoid re-crawling, (7) Content deduplication — SimHash to detect near-duplicate pages, (8) Data store — store crawled pages for indexing. Respect robots.txt, rate limit per domain, handle redirects/traps.",
+    tips: "Discuss BFS vs DFS traversal, how to handle dynamic JS-rendered pages (headless browser), and incremental re-crawling strategies."
+  },
+  {
+    id: 264, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Strangler Fig pattern for migrating legacy systems?",
+    options: [
+      "A pattern for removing unused code from legacy applications",
+      "Incrementally replace parts of a legacy system by routing specific features to new services while keeping the old system running, until the legacy system is fully replaced",
+      "A testing pattern that stresses legacy systems to find breaking points",
+      "A deployment strategy that runs old and new versions simultaneously"
+    ],
+    correctOption: 1,
+    answer: "Named after strangler fig trees that grow around host trees. Route traffic through a facade (API gateway). Gradually redirect individual features/endpoints from the legacy monolith to new microservices. The old system continues handling unreplaced features. Over time, all traffic moves to new services and the monolith is decommissioned. Low risk because you migrate piece by piece with rollback capability.",
+    tips: "Pair with feature flags for gradual rollout. Much safer than a 'big bang' rewrite."
+  },
+  {
+    id: 265, topic: "System Design", difficulty: "easy",
+    scenario: "What is a Single Point of Failure (SPOF)?",
+    options: [
+      "A bug that only occurs once and cannot be reproduced",
+      "A component whose failure would cause the entire system to stop working — eliminated through redundancy and failover",
+      "A security vulnerability that allows a single attack to compromise the system",
+      "A bottleneck that slows down one specific API endpoint"
+    ],
+    correctOption: 1,
+    answer: "A SPOF is any component that, if it fails, brings down the whole system. Examples: single database server, single load balancer, single DNS server. Eliminate SPOFs through: redundancy (multiple instances), replication (master-slave DB), failover (automatic switching), geographic distribution (multi-region), and health checks (detect and replace failed components).",
+    tips: "In interviews, always identify SPOFs in your design and explain how you'd mitigate them."
+  },
+  {
+    id: 266, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a distributed key-value store like DynamoDB?",
+    options: [
+      "Use a single server with a HashMap and replicate via cron jobs",
+      "Use consistent hashing for partitioning, quorum reads/writes (W+R > N) for consistency, vector clocks for conflict resolution, and gossip protocol for failure detection",
+      "Store key-value pairs in a relational database with an index on the key column",
+      "Use a shared filesystem where each file represents a key"
+    ],
+    correctOption: 1,
+    answer: "Key components: (1) Partitioning — consistent hashing with virtual nodes distributes keys across nodes, (2) Replication — each key replicated to N successor nodes on the hash ring, (3) Consistency — configurable quorum (W writes + R reads > N replicas), (4) Conflict resolution — vector clocks detect conflicts, application resolves (or last-write-wins), (5) Failure detection — gossip protocol, (6) Storage engine — LSM-tree (write-optimized) or B-tree, (7) Compaction — merge SSTables periodically.",
+    tips: "Discuss the CAP theorem trade-offs: DynamoDB chooses AP (availability + partition tolerance) with tunable consistency."
+  },
+  {
+    id: 267, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Bulkhead pattern?",
+    options: [
+      "A pattern for reinforcing server hardware against physical damage",
+      "A pattern that isolates components into pools so that failure in one doesn't cascade to others — like watertight compartments in a ship",
+      "A pattern for bulk-inserting data into databases efficiently",
+      "A UI pattern for creating header sections in web pages"
+    ],
+    correctOption: 1,
+    answer: "Named after ship bulkheads (watertight compartments). Isolate resources into separate pools: separate thread pools per downstream service, separate connection pools per database, separate circuit breakers per dependency. If Service A's thread pool is exhausted due to a slow dependency, Service B's pool remains unaffected. Implementation: dedicated thread pools (Resilience4j), separate process/container per service, or separate infrastructure per tenant.",
+    tips: "Combine with Circuit Breaker and Rate Limiter for a comprehensive resilience strategy. Think of it as blast radius containment."
+  },
+  {
+    id: 268, topic: "System Design", difficulty: "easy",
+    scenario: "What is Latency vs Throughput?",
+    options: [
+      "Latency is download speed; Throughput is upload speed",
+      "Latency is the time for a single request to complete; Throughput is the number of requests the system handles per unit of time",
+      "Latency only applies to databases; Throughput only applies to networks",
+      "They are inverse measurements of the same thing"
+    ],
+    correctOption: 1,
+    answer: "Latency: time from request sent to response received (measured in ms). Low latency = fast responses. Throughput: total operations completed per second (measured in req/s or TPS). High throughput = handles many requests. They're related but independent — a system can have low latency but low throughput (fast but not concurrent), or high throughput but high latency (many concurrent slow requests).",
+    tips: "Optimize latency with caching, CDNs, connection pooling. Optimize throughput with horizontal scaling, async processing, batching."
+  },
+  {
+    id: 269, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a news feed system like Twitter/Facebook?",
+    options: [
+      "Query all followed users' posts in real-time on each page load (fan-out on read)",
+      "Two approaches: Fan-out on write (pre-compute feeds for followers when a post is created) for most users, and Fan-out on read for celebrity users with millions of followers — hybrid approach",
+      "Store all posts in chronological order and let users scroll through them",
+      "Email new posts to all followers"
+    ],
+    correctOption: 1,
+    answer: "Hybrid approach: (1) Fan-out on write — when a user posts, push the post ID to each follower's pre-computed feed cache (Redis list). Fast reads but expensive writes for popular users. (2) Fan-out on read — for celebrities (>1M followers), don't pre-compute. Merge their posts at read time. (3) Feed service — merges pre-computed feed + celebrity posts + ranking algorithm. (4) Ranking — ML model scores posts by relevance, not just chronology. Storage: post content in DB, feed lists in Redis.",
+    tips: "Twitter uses fan-out on write for most users. The threshold for 'celebrity mode' is typically ~5K followers. Discuss cache invalidation when posts are deleted."
+  },
+  {
+    id: 270, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Sidecar pattern in microservices?",
+    options: [
+      "A deployment pattern where a secondary team monitors primary services",
+      "Deploying a helper container alongside the main service container in the same pod, handling cross-cutting concerns like logging, monitoring, networking, or security",
+      "A testing pattern where tests run alongside production code",
+      "A pattern for running two versions of a service simultaneously"
+    ],
+    correctOption: 1,
+    answer: "A sidecar is a separate process/container deployed alongside the main application container (same pod in Kubernetes). It handles cross-cutting concerns without modifying app code: service mesh proxy (Envoy/Istio), log collectors (Fluentd), monitoring agents, TLS termination, config management. Benefits: language-agnostic (sidecar works with any app), separation of concerns, independent updates. The main app communicates with sidecar via localhost.",
+    tips: "Istio/Envoy service mesh is the most common sidecar example. Each pod gets an Envoy proxy sidecar that handles mTLS, retries, circuit breaking."
+  },
+  {
+    id: 271, topic: "System Design", difficulty: "easy",
+    scenario: "What does 'eventual consistency' mean?",
+    options: [
+      "The system will eventually crash if there are too many writes",
+      "After a write, all replicas will eventually converge to the same value — reads may temporarily return stale data but will become consistent over time",
+      "Consistency checks happen at the end of each business day",
+      "Data is consistent only if you query the primary database directly"
+    ],
+    correctOption: 1,
+    answer: "In an eventually consistent system, after a write, replicas may temporarily return different values, but given enough time (usually milliseconds to seconds) without new updates, all replicas will converge to the same value. Trade-off: higher availability and lower latency vs temporary staleness. Used by: DynamoDB, Cassandra, DNS, CDN caches. Contrast with strong consistency (every read returns the latest write).",
+    tips: "Most real-world systems use eventual consistency. Your social media feed being a few seconds stale is acceptable — your bank balance being stale is not."
+  },
+  {
+    id: 272, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a distributed locking service?",
+    options: [
+      "Use file locks on a shared NFS mount",
+      "Use Redis (SETNX with TTL) for simple cases, or ZooKeeper/etcd with ephemeral nodes and fencing tokens for stronger guarantees",
+      "Use database row-level locks with SELECT FOR UPDATE",
+      "Implement a custom TCP-based locking protocol"
+    ],
+    correctOption: 1,
+    answer: "Simple: Redis SETNX (SET if Not eXists) with TTL — fast but not perfectly safe (clock drift, split-brain). Redlock algorithm across N Redis instances for better safety. Robust: ZooKeeper/etcd — create ephemeral sequential nodes, lowest sequence number holds lock. Fencing tokens: each lock acquisition gets an incrementing token; resources reject operations with older tokens (prevents issues when locks expire while still processing). Key concerns: deadlock prevention (TTL), fairness (FIFO), and split-brain scenarios.",
+    tips: "Martin Kleppmann's critique of Redlock is a great discussion point. ZooKeeper provides stronger guarantees but higher latency."
+  },
+  {
+    id: 273, topic: "System Design", difficulty: "medium",
+    scenario: "What is a Data Lake vs a Data Warehouse?",
+    options: [
+      "Data Lake is for big companies; Data Warehouse is for small companies",
+      "Data Lake stores raw, unstructured data at scale (schema-on-read); Data Warehouse stores processed, structured data optimized for analytics (schema-on-write)",
+      "Data Lake is in the cloud; Data Warehouse is on-premise",
+      "They are the same thing with different marketing names"
+    ],
+    correctOption: 1,
+    answer: "Data Lake (S3, HDFS): Stores raw data in any format (JSON, CSV, Parquet, images, logs). Schema applied when reading (schema-on-read). Cheap storage, supports ML/data science. Risk: becomes a 'data swamp' without governance. Data Warehouse (Redshift, BigQuery, Snowflake): Stores cleaned, transformed, structured data. Schema enforced on write. Optimized for SQL analytics and BI dashboards. Modern approach: Lakehouse (Delta Lake, Iceberg) — combines both.",
+    tips: "ETL loads into warehouse (Extract, Transform, Load). ELT loads into lake first, then transforms (Extract, Load, Transform)."
+  },
+  {
+    id: 274, topic: "System Design", difficulty: "easy",
+    scenario: "What is a Health Check endpoint?",
+    options: [
+      "An endpoint that monitors employee health records",
+      "A dedicated API endpoint (e.g., /health) that returns the service's status — used by load balancers, orchestrators, and monitoring systems to detect unhealthy instances",
+      "A security scan endpoint that checks for vulnerabilities",
+      "An endpoint that returns the server's CPU and memory usage"
+    ],
+    correctOption: 1,
+    answer: "A simple endpoint (GET /health or /healthz) that returns 200 OK when the service is healthy. Types: Liveness (is the process running?), Readiness (is it ready to serve traffic?), Deep health (checks dependencies — DB, cache, external APIs). Used by: Kubernetes (liveness/readiness probes), load balancers (remove unhealthy instances from pool), monitoring (PagerDuty/Datadog alerts).",
+    tips: "Kubernetes uses livenessProbe (restart if failing) and readinessProbe (stop sending traffic if failing). Keep liveness checks lightweight."
+  },
+  {
+    id: 275, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a payment system like Stripe?",
+    options: [
+      "Call the bank API directly from the frontend for each payment",
+      "Build an idempotent payment service with double-entry ledger, state machine for transaction lifecycle, retry with exponential backoff, and reconciliation jobs",
+      "Store credit card numbers in a database table and process payments via cron",
+      "Use blockchain for all payment transactions"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Payment API — idempotent (idempotency key prevents double charges), (2) Payment state machine — CREATED → PROCESSING → SUCCEEDED/FAILED, (3) Double-entry ledger — every transaction has a debit and credit entry, (4) Payment processor integration — Stripe/Adyen/bank APIs with retry logic, (5) Webhook handler — receive async payment confirmations, (6) Reconciliation — daily jobs match internal records with bank statements, (7) Fraud detection — ML model scores risk. PCI DSS compliance: never store raw card numbers, use tokenization.",
+    tips: "Idempotency is the #1 most important concept. Discuss exactly-once payment processing and how to handle network timeouts."
+  },
+  {
+    id: 276, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between Monolith, SOA, and Microservices?",
+    options: [
+      "They are three different programming languages",
+      "Monolith: single deployable unit; SOA: shared services with ESB; Microservices: small, independently deployable services with decentralized data — each an evolution in managing complexity at scale",
+      "Monolith is for backend; SOA is for frontend; Microservices is for mobile",
+      "They all mean the same architecture with different names"
+    ],
+    correctOption: 1,
+    answer: "Monolith: All code in one codebase, one deployment. Simple to start, hard to scale teams/features independently. SOA (Service-Oriented Architecture): Services share an Enterprise Service Bus (ESB), shared database, SOAP/XML. Microservices: Small, independently deployable services, each owns its data, communicates via lightweight protocols (REST/gRPC/events). Benefits: independent deployment, team autonomy, tech diversity. Cost: operational complexity, distributed system challenges.",
+    tips: "Start monolith, extract microservices when you hit team/scaling pain points. Don't start with microservices for a new project."
+  },
+  {
+    id: 277, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a video streaming platform like YouTube?",
+    options: [
+      "Store videos as files and serve them directly via HTTP",
+      "Transcode uploaded videos into multiple resolutions/codecs, store on object storage, serve via CDN with adaptive bitrate streaming (HLS/DASH), and use a separate metadata service for search/recommendations",
+      "Convert all videos to GIFs for faster loading",
+      "Stream videos directly from the uploader's device to viewers using P2P"
+    ],
+    correctOption: 1,
+    answer: "Upload pipeline: (1) Upload service accepts video → stores raw in object storage (S3), (2) Transcoding service (distributed workers) encodes into multiple resolutions (1080p, 720p, 480p) and codecs (H.264, VP9), (3) Store transcoded segments + manifest file. Playback: (4) CDN serves video segments from nearest edge, (5) Adaptive bitrate streaming (HLS/DASH) — player switches quality based on bandwidth. Metadata: (6) Video metadata service (title, tags, views) in DB, (7) Search index (Elasticsearch), (8) Recommendation engine. Scale: thumbnail generation, comment service, view counter (approximate counting with Redis).",
+    tips: "Discuss DAG-based transcoding pipeline, how live streaming differs (RTMP ingest + low-latency HLS), and copyright detection (Content ID)."
+  },
+  {
+    id: 278, topic: "System Design", difficulty: "medium",
+    scenario: "What is Back Pressure in distributed systems?",
+    options: [
+      "Physical pressure on server hardware from high temperatures",
+      "A mechanism where a slow consumer signals the producer to slow down, preventing overwhelm — applied through bounded queues, rate limiting, or flow control",
+      "The network latency caused by data traveling long distances",
+      "Compression applied to data before sending it over the network"
+    ],
+    correctOption: 1,
+    answer: "When a consumer can't keep up with the producer's rate, back pressure prevents the system from being overwhelmed. Strategies: (1) Bounded queues — reject/block when full, (2) Rate limiting — producer respects consumer's capacity, (3) Load shedding — drop low-priority messages, (4) Reactive Streams — consumer signals demand (request N items). Without back pressure: memory exhaustion, cascading failures, data loss. Examples: TCP flow control, Kafka consumer lag alerts, RxJava/Project Reactor.",
+    tips: "Unbounded queues are a common anti-pattern — they just delay the crash. Always use bounded queues with a back pressure strategy."
+  },
+  {
+    id: 279, topic: "System Design", difficulty: "easy",
+    scenario: "What is the difference between Stateful and Stateless services?",
+    options: [
+      "Stateful services are written in typed languages; Stateless in dynamic languages",
+      "Stateless services don't store client session data between requests (each request is independent); Stateful services maintain client state across requests",
+      "Stateful services are faster because they remember previous results",
+      "Stateless services cannot use databases"
+    ],
+    correctOption: 1,
+    answer: "Stateless: Each request contains all information needed to process it. No server-side session state. Any instance can handle any request → easy to scale horizontally. Examples: REST APIs, Lambda functions. Stateful: Server remembers client context between requests (session, WebSocket connection, in-memory cache). Requires sticky sessions or session replication. Examples: WebSocket servers, game servers, databases.",
+    tips: "Design stateless wherever possible. Store state externally (Redis, DB) so any instance can serve any request."
+  },
+  {
+    id: 280, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a ride-sharing matching system like Uber?",
+    options: [
+      "Assign the nearest driver using SQL ORDER BY distance LIMIT 1",
+      "Use a geospatial index (Geohash/S2/H3) to find nearby drivers, a matching service that optimizes for ETA/distance/driver rating, and real-time location updates via WebSocket",
+      "Let drivers browse available ride requests and pick the ones they want",
+      "Use a round-robin algorithm to distribute rides evenly among all drivers"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Location service — drivers send GPS every 3-5s via WebSocket, stored in Redis with geospatial index (GEOADD/GEOSEARCH), (2) Matching service — when rider requests, query nearby available drivers (Geohash/S2 cells), rank by ETA + rating + direction of travel, send ride offer, (3) Dispatch — if driver declines, offer to next candidate (with timeout), (4) Trip service — manages trip lifecycle (matching → pickup → in-progress → completed), (5) Pricing service — surge pricing based on demand/supply ratio per zone, (6) ETA service — uses road network graph (Dijkstra/A*) with real-time traffic. Scale: partition by city/region.",
+    tips: "Discuss the supply/demand balance problem, how surge pricing is calculated (hex grid demand/supply ratio), and handling driver location staleness."
+  },
+  {
+    id: 281, topic: "System Design", difficulty: "medium",
+    scenario: "What is a Service Mesh?",
+    options: [
+      "A network of microservices connected in a mesh topology",
+      "A dedicated infrastructure layer (sidecar proxies) that handles service-to-service communication — providing mTLS, load balancing, retries, observability, and traffic management without changing application code",
+      "A monitoring dashboard that visualizes service dependencies",
+      "A deployment tool for orchestrating microservice rollouts"
+    ],
+    correctOption: 1,
+    answer: "A service mesh adds a sidecar proxy (e.g., Envoy) next to each service. The proxies form the 'data plane' handling all inter-service traffic. A 'control plane' (Istio, Linkerd) configures the proxies. Features: mTLS (encrypted service-to-service communication), load balancing, circuit breaking, retries, timeouts, traffic splitting (canary deployments), distributed tracing, and access policies. All without modifying application code.",
+    tips: "Adds latency (extra network hop through proxy) and operational complexity. Best for large microservice deployments (50+ services)."
+  },
+  {
+    id: 282, topic: "System Design", difficulty: "easy",
+    scenario: "What is Idempotency and why does it matter in APIs?",
+    options: [
+      "A security measure that prevents SQL injection",
+      "Making the same request multiple times produces the same result — critical for safe retries in distributed systems where network failures can cause duplicate requests",
+      "A performance optimization that caches API responses",
+      "A testing strategy that verifies APIs return identical responses"
+    ],
+    correctOption: 1,
+    answer: "An idempotent operation produces the same result regardless of how many times it's called. GET, PUT, DELETE are naturally idempotent. POST is not (creates duplicate resources). For non-idempotent operations, use an idempotency key: client sends a unique ID with each request, server checks if it's already processed. Essential because: network timeouts may cause retries, message queues may deliver duplicates, users may double-click submit.",
+    tips: "Stripe uses 'Idempotency-Key' header. Implement with: store idempotency key + response in Redis with TTL, return cached response for duplicate keys."
+  },
+  {
+    id: 283, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a content moderation system at scale?",
+    options: [
+      "Hire enough moderators to review every piece of content manually",
+      "Use a multi-layer pipeline: automated ML filters (text/image/video classification) for fast detection, confidence-based routing to human review queues, feedback loops to retrain models, and an appeals process",
+      "Block all user-generated content until manually approved",
+      "Use keyword blacklists to filter harmful content"
+    ],
+    correctOption: 1,
+    answer: "Pipeline: (1) Pre-upload — client-side hash check against known bad content (PhotoDNA), (2) Automated ML — text classification (toxicity models), image classification (NSFW, violence), video frame sampling, (3) Confidence routing — high confidence → auto-action, low confidence → human review queue, (4) Human review — prioritized queues (severity-based), moderator tools with context, (5) Appeals — separate review team, (6) Feedback loop — human decisions retrain ML models. Scale: process millions of items/day, most handled automatically, humans review ~1-5%.",
+    tips: "Discuss moderator well-being (rotation, counseling), false positive rates, cultural context challenges, and legal requirements (CSAM reporting)."
+  },
+  {
+    id: 284, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between gRPC and REST?",
+    options: [
+      "gRPC is Google's proprietary REST implementation",
+      "REST uses HTTP/1.1 + JSON with resource-based URLs; gRPC uses HTTP/2 + Protocol Buffers with RPC-style calls — gRPC is faster but less human-readable",
+      "REST is for external APIs; gRPC is only for internal communication",
+      "gRPC doesn't support streaming; REST does"
+    ],
+    correctOption: 1,
+    answer: "REST: HTTP/1.1, JSON (text-based, human-readable), resource-oriented (GET /users/123), widely supported, great for public APIs. gRPC: HTTP/2 (multiplexed, binary framing), Protocol Buffers (binary serialization, smaller payload, schema-enforced), RPC-style (userService.GetUser(id)), supports streaming (unary, server, client, bidirectional). gRPC is 2-10x faster due to binary format + HTTP/2. Use REST for public APIs, gRPC for internal service-to-service communication.",
+    tips: "gRPC requires .proto files (contract-first). REST is more flexible but lacks strict contracts (unless using OpenAPI). gRPC-Web bridges gRPC to browsers."
+  },
+  {
+    id: 285, topic: "System Design", difficulty: "easy",
+    scenario: "What is Database Replication?",
+    options: [
+      "Copying a database schema to a different database engine",
+      "Maintaining copies of the same data on multiple servers for high availability, read scaling, and disaster recovery",
+      "Backing up a database to tape storage weekly",
+      "Running the same query on multiple databases simultaneously"
+    ],
+    correctOption: 1,
+    answer: "Replication copies data across multiple database servers. Types: Master-Slave (single writer, multiple readers), Master-Master (multiple writers, conflict resolution needed), Synchronous (write confirmed after all replicas updated — strong consistency, higher latency), Asynchronous (write confirmed after primary, replicas catch up — eventual consistency, lower latency). Benefits: high availability (failover), read scaling (distribute read load), geographic distribution (lower latency for global users).",
+    tips: "Discuss replication lag (stale reads from replicas) and failover strategies (manual vs automatic promotion of replica to primary)."
+  },
+  {
+    id: 286, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a recommendation engine like Netflix/Amazon?",
+    options: [
+      "Show the most popular items to everyone",
+      "Use collaborative filtering (users who liked X also liked Y), content-based filtering (similar attributes), and a hybrid approach with ML models that personalize rankings in real-time",
+      "Let users manually tag their preferences and filter accordingly",
+      "Randomly suggest items to increase discovery"
+    ],
+    correctOption: 1,
+    answer: "Approaches: (1) Collaborative filtering — user-based (find similar users, recommend their items) or item-based (find similar items to what user liked), (2) Content-based — recommend items with similar attributes (genre, director, ingredients), (3) Hybrid — combine both with ML. Architecture: offline pipeline (batch compute embeddings/similarity matrices on Spark), online service (real-time ranking using user context — time, device, recent activity), A/B testing framework. Models: matrix factorization, deep learning (two-tower model), contextual bandits for exploration vs exploitation.",
+    tips: "Discuss the cold start problem (new users/items with no data) and how to solve it (popularity baseline, ask preferences, content-based fallback)."
+  },
+  {
+    id: 287, topic: "System Design", difficulty: "medium",
+    scenario: "What is the 12-Factor App methodology?",
+    options: [
+      "An app must have exactly 12 microservices to be production-ready",
+      "A set of 12 best practices for building scalable, maintainable cloud-native applications — covering codebase, dependencies, config, backing services, build/release/run, processes, port binding, concurrency, disposability, dev/prod parity, logs, and admin processes",
+      "A security framework with 12 compliance checkpoints",
+      "A database design methodology with 12 normalization rules"
+    ],
+    correctOption: 1,
+    answer: "The 12 factors: (1) Codebase — one repo per app, (2) Dependencies — explicitly declare and isolate, (3) Config — store in environment variables, (4) Backing services — treat as attached resources, (5) Build/Release/Run — strict separation, (6) Processes — stateless, share-nothing, (7) Port binding — export services via port, (8) Concurrency — scale via process model, (9) Disposability — fast startup, graceful shutdown, (10) Dev/prod parity — keep environments similar, (11) Logs — treat as event streams, (12) Admin processes — run as one-off tasks.",
+    tips: "Created by Heroku founders. Still the gold standard for cloud-native app design. Kubernetes naturally enforces many of these."
+  },
+  {
+    id: 288, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a global-scale CDN?",
+    options: [
+      "Place one large server in each continent",
+      "Deploy edge servers in hundreds of PoPs worldwide, use anycast routing for nearest-server selection, implement tiered caching (edge → regional → origin), and use consistent hashing for cache distribution",
+      "Use DNS round-robin to distribute traffic globally",
+      "Mirror the entire origin server's content to every edge location"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) PoPs (Points of Presence) — edge servers in 200+ locations worldwide, (2) Anycast — same IP address advertised from all PoPs, BGP routes users to nearest PoP, (3) Tiered caching — L1 (edge, small, fast) → L2 (regional, larger) → Origin shield (single point to origin, reduces origin load), (4) Cache key — URL + headers (Vary), consistent hashing across servers in a PoP, (5) Purge system — invalidate cached content globally in seconds, (6) TLS termination at edge — reduce round trips. Optimizations: Brotli compression, HTTP/2 push, image optimization, edge compute (Cloudflare Workers).",
+    tips: "Discuss cache hit ratio optimization (>95% target), stale-while-revalidate, and how edge compute moves logic closer to users."
+  },
+  {
+    id: 289, topic: "System Design", difficulty: "medium",
+    scenario: "What is Blue-Green Deployment?",
+    options: [
+      "A color-coded monitoring system for service health",
+      "Running two identical production environments (Blue and Green) — deploy new version to the idle environment, test it, then switch traffic from the active to the new environment for zero-downtime releases",
+      "A deployment strategy where blue team deploys to staging and green team deploys to production",
+      "Using green energy-efficient servers for production workloads"
+    ],
+    correctOption: 1,
+    answer: "Two identical environments: Blue (current production) and Green (idle). Deploy new version to Green, run smoke tests. Switch traffic (via load balancer/DNS) from Blue to Green. If issues arise, instant rollback by switching back to Blue. Benefits: zero downtime, easy rollback, full environment testing. Related strategies: Canary (gradually shift traffic %), Rolling (update instances one by one), A/B testing (different versions for different user segments).",
+    tips: "Requires double the infrastructure (cost). Discuss database migration challenges — both versions must be compatible with the schema."
+  },
+  {
+    id: 290, topic: "System Design", difficulty: "easy",
+    scenario: "What is DNS and how does it work?",
+    options: [
+      "A protocol for encrypting network traffic",
+      "The Domain Name System translates human-readable domain names (google.com) to IP addresses (142.250.80.46) through a hierarchical resolution process",
+      "A database that stores website content",
+      "A firewall that filters domains based on security policies"
+    ],
+    correctOption: 1,
+    answer: "DNS resolution: (1) Browser checks local cache, (2) OS checks /etc/hosts + system cache, (3) Recursive resolver (ISP/8.8.8.8) checks its cache, (4) Root nameserver → points to TLD server (.com), (5) TLD server → points to authoritative nameserver (google.com's NS), (6) Authoritative NS returns the IP address. Record types: A (IPv4), AAAA (IPv6), CNAME (alias), MX (mail), TXT (verification), NS (nameserver). TTL controls cache duration.",
+    tips: "DNS is often overlooked in system design but it's critical — it's a global distributed key-value store. Discuss DNS-based load balancing and failover."
+  },
+  {
+    id: 291, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a distributed tracing system like Jaeger?",
+    options: [
+      "Add print statements to every function and grep the logs",
+      "Assign each request a unique trace ID, propagate it through all services via headers, collect spans (timing data) at each service, and aggregate into a trace timeline for debugging latency and failures",
+      "Use a centralized log file that all services write to",
+      "Monitor CPU usage of each service to identify bottlenecks"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Instrumentation — SDK in each service creates spans (operation name, start/end time, tags, parent span ID), (2) Context propagation — trace ID + span ID passed via HTTP headers (traceparent) or gRPC metadata, (3) Collection — agents on each host batch and send spans to collector (Kafka for buffering), (4) Storage — Elasticsearch/Cassandra for span data, (5) Query/UI — reconstruct full trace timeline, show service dependency graph, identify slow spans. Standards: OpenTelemetry (merged OpenTracing + OpenCensus). Sampling: collect 1-10% of traces in production to control costs.",
+    tips: "Discuss the three pillars of observability: logs (what happened), metrics (aggregated measurements), traces (request flow across services)."
+  },
+  {
+    id: 292, topic: "System Design", difficulty: "medium",
+    scenario: "What is the CAP theorem's PACELC extension?",
+    options: [
+      "An updated version that adds Performance, Availability, Cost, Efficiency, Latency, and Consistency",
+      "If Partitioned: choose Availability or Consistency. Else (normal operation): choose Latency or Consistency — acknowledging that trade-offs exist even without network partitions",
+      "A consensus protocol that extends Paxos with additional safety guarantees",
+      "A benchmarking framework for evaluating distributed databases"
+    ],
+    correctOption: 1,
+    answer: "PACELC: if there's a Partition (P), choose Availability (A) or Consistency (C). Else (E, normal operation), choose Latency (L) or Consistency (C). This addresses CAP's limitation — CAP only discusses partition scenarios, but trade-offs exist in normal operation too. DynamoDB: PA/EL (available during partition, low latency normally). PostgreSQL: PC/EC (consistent always, higher latency). Cassandra: PA/EL (tunable). MongoDB: PA/EC (available during partition, consistent normally).",
+    tips: "PACELC gives a more complete picture than CAP alone. Use it to compare database choices in system design interviews."
+  },
+  {
+    id: 293, topic: "System Design", difficulty: "easy",
+    scenario: "What is Horizontal Pod Autoscaling in Kubernetes?",
+    options: [
+      "Manually adding more pods when traffic increases",
+      "Automatically scaling the number of pod replicas up or down based on observed metrics like CPU usage, memory, or custom metrics",
+      "Increasing the CPU/memory limits of existing pods",
+      "Distributing pods horizontally across multiple nodes"
+    ],
+    correctOption: 1,
+    answer: "HPA automatically adjusts the replica count of a Deployment/ReplicaSet based on metrics. Default: CPU utilization target (e.g., scale up when avg CPU > 70%). Also supports: memory, custom metrics (requests per second, queue depth), external metrics (CloudWatch). Control loop runs every 15s. Scale-up is fast; scale-down has a stabilization window (5 min default) to prevent flapping. Combine with Cluster Autoscaler (adds/removes nodes) for full elastic scaling.",
+    tips: "VPA (Vertical Pod Autoscaler) adjusts pod resource requests/limits instead. Use HPA for traffic-driven scaling, VPA for right-sizing."
+  },
+  {
+    id: 294, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a search engine's indexing system?",
+    options: [
+      "Store all web pages in a single database table and use SQL LIKE queries",
+      "Build an inverted index that maps every word to the list of documents containing it, with TF-IDF/BM25 scoring for relevance ranking, stored in a distributed system for parallel query processing",
+      "Use regular expressions to search through raw HTML files",
+      "Create a separate database for each website"
+    ],
+    correctOption: 1,
+    answer: "Indexing pipeline: (1) Crawler fetches web pages, (2) Parser extracts text, strips HTML, (3) Tokenizer breaks text into terms (lowercase, stemming, stop word removal), (4) Inverted index — map each term to a posting list (docID, term frequency, positions), (5) Store index in distributed system (sharded by term or document), (6) Ranking — BM25 (term frequency, inverse document frequency, document length) + PageRank (link analysis) + ML features. Query processing: parse query → look up terms in index → intersect posting lists → score and rank → return top results.",
+    tips: "Discuss how to handle real-time indexing (new/updated pages), phrase queries (positional index), and how Google uses BERT for semantic understanding."
+  },
+  {
+    id: 295, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Outbox pattern for reliable event publishing?",
+    options: [
+      "Storing outbound emails in an outbox folder before sending",
+      "Writing events to an outbox table in the same database transaction as the business data, then a separate process publishes events from the outbox to the message broker — ensuring atomicity",
+      "A pattern for queuing outbound API calls when external services are down",
+      "Storing failed events in a dead letter queue for retry"
+    ],
+    correctOption: 1,
+    answer: "Problem: When a service updates its DB and publishes an event, either could fail independently (DB succeeds but event publish fails, or vice versa). Solution: Write the event to an 'outbox' table in the same DB transaction as the business data. A separate process (polling or CDC — Change Data Capture via Debezium) reads the outbox and publishes to the message broker (Kafka). The event is deleted/marked after successful publish. Guarantees: event is published if and only if the business data was committed.",
+    tips: "Debezium + CDC (reading DB transaction log) is more efficient than polling. This pattern is essential for microservices with eventual consistency."
+  },
+  {
+    id: 296, topic: "System Design", difficulty: "easy",
+    scenario: "What is Rate Limiting and why is it important?",
+    options: [
+      "Limiting the rate at which data is written to disk",
+      "Controlling the number of requests a client can make to an API within a time window — preventing abuse, protecting resources, and ensuring fair usage",
+      "Limiting the data transfer rate between servers",
+      "A pricing strategy that charges based on API usage"
+    ],
+    correctOption: 1,
+    answer: "Rate limiting restricts how many requests a client can make in a given time period. Why: prevent DDoS attacks, stop abusive bots, protect expensive operations, ensure fair access, control costs. Implementation: per-IP, per-user, per-API-key. Response: HTTP 429 Too Many Requests with Retry-After header. Where: API gateway, middleware, or application layer. Headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset.",
+    tips: "Differentiate between throttling (slow down) and rate limiting (reject). Use tiered limits: free tier (100/day), paid (10,000/day)."
+  },
+  {
+    id: 297, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a multi-tenant SaaS architecture?",
+    options: [
+      "Deploy a separate application instance for each customer",
+      "Use a shared infrastructure with tenant isolation at the data layer (shared DB with tenant_id, schema-per-tenant, or DB-per-tenant), configurable per-tenant features, and resource quotas",
+      "Let all tenants share everything with no isolation",
+      "Use a different cloud provider for each tenant"
+    ],
+    correctOption: 1,
+    answer: "Data isolation models: (1) Shared DB, shared schema (tenant_id column on every table) — cheapest, hardest to isolate, (2) Shared DB, separate schemas — moderate isolation, (3) Separate DB per tenant — strongest isolation, most expensive. Compute: shared services with tenant context in JWT/headers. Features: tenant-specific config (feature flags, branding, limits), resource quotas (rate limiting per tenant), noisy neighbor prevention (fair scheduling). Security: row-level security in DB, tenant context in every query, audit logging per tenant.",
+    tips: "Start with shared DB + tenant_id (simplest). Move large tenants to dedicated DBs as needed. Always include tenant_id in every DB query to prevent data leaks."
+  },
+  {
+    id: 298, topic: "System Design", difficulty: "medium",
+    scenario: "What is Graceful Degradation vs Fail Fast?",
+    options: [
+      "Graceful degradation is for frontend; Fail fast is for backend",
+      "Graceful degradation maintains reduced functionality when components fail (show cached data, disable non-critical features); Fail fast immediately reports errors to callers instead of waiting/retrying — both are valid strategies for different scenarios",
+      "Graceful degradation means slow shutdown; Fail fast means instant restart",
+      "They are opposite names for the same error handling strategy"
+    ],
+    correctOption: 1,
+    answer: "Graceful degradation: When a dependency fails, provide reduced but functional service. Examples: show cached data when DB is down, disable recommendations but keep browsing working, serve static pages when app servers fail. Fail fast: Immediately return an error instead of waiting for a timeout. Examples: circuit breaker in Open state returns instantly, validation fails before expensive processing. When to use: degrade for user-facing features, fail fast for internal services to prevent resource exhaustion.",
+    tips: "Netflix is the gold standard for graceful degradation — their services have fallbacks for every dependency. Fail fast prevents cascading slowdowns."
+  },
+  {
+    id: 299, topic: "System Design", difficulty: "easy",
+    scenario: "What is Webhook vs Polling?",
+    options: [
+      "Webhook is for sending data; Polling is for receiving data",
+      "Polling: client repeatedly asks the server for updates at intervals; Webhook: server pushes updates to the client's URL when events occur — webhooks are more efficient for event-driven scenarios",
+      "Webhooks are more secure than polling",
+      "Polling works in real-time; Webhooks have delays"
+    ],
+    correctOption: 1,
+    answer: "Polling: Client sends requests at intervals (e.g., every 5 seconds) to check for updates. Simple but wastes resources when there are no updates (empty responses). Webhook: Client registers a callback URL. Server sends an HTTP POST to that URL when an event occurs. Efficient (no wasted requests) but requires the client to expose an endpoint. Used by: Stripe (payment events), GitHub (push events), Slack (bot events). Best practice: use webhooks with a polling fallback for reliability.",
+    tips: "Webhooks need idempotency handling (server may retry), signature verification (HMAC), and a retry/dead-letter mechanism."
+  },
+  {
+    id: 300, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design an online collaborative editor like Google Docs?",
+    options: [
+      "Lock the document so only one user can edit at a time",
+      "Use Operational Transformation (OT) or CRDTs to handle concurrent edits, with a collaboration server that broadcasts changes in real-time via WebSocket, and conflict-free merging of simultaneous edits",
+      "Save the document every 5 seconds and let the last save win",
+      "Give each user a copy and merge manually when they're done"
+    ],
+    correctOption: 1,
+    answer: "Two main approaches: (1) Operational Transformation (OT) — transform operations against concurrent operations so they converge. Used by Google Docs. Server acts as central authority for operation ordering. (2) CRDTs (Conflict-free Replicated Data Types) — data structures that mathematically guarantee convergence without central coordination. Used by Figma. Architecture: WebSocket connection per user, changes broadcast to all editors, server persists operation log, client applies remote operations to local state. Features: cursor presence, undo/redo per user, version history (snapshots), offline editing (queue operations, sync on reconnect).",
+    tips: "OT is simpler but requires a central server. CRDTs are more complex but work in P2P/offline scenarios. Discuss Yjs (CRDT library) as a practical implementation."
+  },
 ];
