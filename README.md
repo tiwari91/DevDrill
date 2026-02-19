@@ -1,12 +1,12 @@
 # DevDrill
 
-A dark-themed interview prep flashcard app for software engineers. Practice 300 questions across 10 topics with exam mode, timed challenges, progress tracking, and keyboard shortcuts.
+A dark-themed interview prep flashcard app for software engineers. Practice 415 questions across 10 topics with exam mode, timed challenges, progress tracking, and keyboard shortcuts.
 
-## Topics (300 Questions)
+## Topics (415 Questions)
 
 | Topic | Questions | Difficulty Mix |
 |-------|:---------:|----------------|
-| System Design | 85 | Easy, Medium, Hard |
+| System Design | 200 | Easy, Medium, Hard |
 | Spring Boot | 30 | Easy, Medium, Hard |
 | Docker | 25 | Easy, Medium, Hard |
 | Kubernetes | 25 | Easy, Medium, Hard |
