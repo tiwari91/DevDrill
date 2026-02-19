@@ -3171,4 +3171,266 @@ export const INTERVIEW_QUESTIONS = [
     answer: "Amazon Cognito provides user identity management. User Pools handle sign-up/sign-in (username/password, social login, MFA) and issue JWTs. Identity Pools provide temporary AWS credentials for accessing resources (S3, DynamoDB). Together they handle full auth for web/mobile apps.",
     tips: "User Pool = authentication (who). Identity Pool = authorization (access to AWS resources)."
   },
+
+  // --- SYSTEM DESIGN (241-260) ---
+  {
+    id: 241, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a URL shortener like bit.ly?",
+    options: [
+      "Store the full URL in the path itself using URL encoding",
+      "Generate a unique short key (Base62 encoding of an auto-increment ID or hash), store mapping in DB, redirect on lookup via 301/302",
+      "Use DNS records to map short URLs to long URLs",
+      "Compress the URL using gzip and store the compressed version"
+    ],
+    correctOption: 1,
+    answer: "Generate a unique short key using Base62 encoding (a-z, A-Z, 0-9) of an auto-increment ID or MD5/SHA hash. Store the short→long mapping in a key-value store (Redis for speed, DB for durability). On request, look up the key and return a 301 (permanent) or 302 (temporary) redirect. For scale: use a counter service or pre-generated key pool to avoid collisions.",
+    tips: "Discuss read-heavy ratio (~100:1), caching hot URLs, analytics tracking, and expiration policies."
+  },
+  {
+    id: 242, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a rate limiter?",
+    options: [
+      "Block all requests after a server reaches 50% CPU usage",
+      "Use algorithms like Token Bucket, Sliding Window, or Fixed Window Counter to track and limit requests per client within a time window",
+      "Add a sleep(1s) delay to every API response",
+      "Use a load balancer to equally distribute requests across servers"
+    ],
+    correctOption: 1,
+    answer: "Common algorithms: Token Bucket (tokens added at fixed rate, each request costs a token), Sliding Window Log (track timestamps of each request), Fixed Window Counter (count per time window), Sliding Window Counter (hybrid). Store counters in Redis for distributed systems. Return 429 Too Many Requests when limit exceeded. Key decisions: rate limit by IP, user ID, or API key.",
+    tips: "Token Bucket is most common in production (used by Stripe, AWS). Discuss where to place it: API gateway vs middleware."
+  },
+  {
+    id: 243, topic: "System Design", difficulty: "medium",
+    scenario: "What is Event-Driven Architecture?",
+    options: [
+      "An architecture where all services poll a database every second for changes",
+      "An architecture where services communicate by producing and consuming events through a message broker, enabling loose coupling and async processing",
+      "An architecture where events are stored in log files and processed nightly",
+      "An architecture that only responds to user click events in the browser"
+    ],
+    correctOption: 1,
+    answer: "Services produce events (e.g., 'OrderPlaced') to a message broker (Kafka, RabbitMQ, SNS/SQS). Other services consume these events asynchronously. Benefits: loose coupling (producers don't know consumers), scalability (consumers scale independently), resilience (events can be replayed). Patterns: Event Notification, Event-Carried State Transfer, Event Sourcing.",
+    tips: "Mention Kafka for high-throughput event streaming and how it differs from traditional message queues."
+  },
+  {
+    id: 244, topic: "System Design", difficulty: "easy",
+    scenario: "What is a CDN (Content Delivery Network)?",
+    options: [
+      "A centralized database that stores all website content",
+      "A geographically distributed network of servers that caches and delivers content from the nearest edge location to reduce latency",
+      "A tool for compressing images before uploading them",
+      "A firewall that filters malicious content from web pages"
+    ],
+    correctOption: 1,
+    answer: "A CDN is a network of servers distributed worldwide (edge locations). Static content (images, CSS, JS, videos) is cached at edge nodes closest to users, reducing latency and load on origin servers. Examples: CloudFront, Cloudflare, Akamai. Dynamic content can also be accelerated via optimized routing.",
+    tips: "Discuss cache invalidation strategies: TTL, purge API, versioned filenames."
+  },
+  {
+    id: 245, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a notification system (push, email, SMS)?",
+    options: [
+      "Send notifications synchronously from each microservice directly to users",
+      "Build a centralized notification service with message queue, template engine, provider adapters, preference management, and delivery tracking",
+      "Store all notifications in a database and let users poll for them",
+      "Use a single third-party API for all notification types"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) API/Event ingestion — services publish notification requests, (2) Message queue (Kafka/SQS) for reliability and decoupling, (3) Template service — renders messages from templates + variables, (4) User preference service — checks opt-in/out, channels, quiet hours, (5) Provider adapters — FCM for push, SES/SendGrid for email, Twilio for SMS, (6) Delivery tracker — logs status, handles retries with exponential backoff, (7) Analytics — open rates, delivery rates.",
+    tips: "Discuss priority levels (urgent vs marketing), rate limiting per user, and idempotency to prevent duplicate sends."
+  },
+  {
+    id: 246, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between SQL and NoSQL databases?",
+    options: [
+      "SQL is for small data; NoSQL is for big data",
+      "SQL databases are relational with fixed schemas and ACID guarantees; NoSQL databases offer flexible schemas, horizontal scaling, and eventual consistency — choose based on data model and scale needs",
+      "NoSQL is always faster than SQL",
+      "SQL databases cannot scale beyond a single server"
+    ],
+    correctOption: 1,
+    answer: "SQL (PostgreSQL, MySQL): Relational, fixed schema, ACID transactions, strong consistency, vertical scaling. Best for structured data with complex queries and joins. NoSQL (MongoDB, DynamoDB, Cassandra): Flexible schema, horizontal scaling, eventual consistency (configurable). Types: Document, Key-Value, Column-Family, Graph. Choose based on: data structure, query patterns, consistency needs, and scale requirements.",
+    tips: "Don't say 'NoSQL is better' — explain trade-offs. Many systems use both (polyglot persistence)."
+  },
+  {
+    id: 247, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a chat system like WhatsApp/Slack?",
+    options: [
+      "Use HTTP polling where clients check for new messages every second",
+      "Use WebSockets for real-time bidirectional communication, with message queues for delivery guarantees, and a fan-out service for group messages",
+      "Store messages in browser localStorage and sync on page refresh",
+      "Use email protocols (SMTP) to deliver chat messages"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) WebSocket gateway — persistent connections for real-time delivery, (2) Chat service — handles message routing, (3) Message queue (Kafka) — ensures delivery even when recipient is offline, (4) Message store — Cassandra/HBase for write-heavy storage with partition by chat_id, (5) Presence service — tracks online/offline/typing status, (6) Push notification service — for offline users, (7) Media service — for images/files (S3 + CDN). Group chats use fan-out: message written once, delivered to each member's queue.",
+    tips: "Discuss message ordering (per-chat sequence IDs), read receipts, end-to-end encryption, and offline message sync."
+  },
+  {
+    id: 248, topic: "System Design", difficulty: "easy",
+    scenario: "What is Database Sharding?",
+    options: [
+      "Creating read replicas of a database for backup purposes",
+      "Splitting a large database into smaller, faster pieces (shards) distributed across multiple servers, each holding a subset of the data",
+      "Encrypting database columns to protect sensitive data",
+      "Compressing database tables to save storage space"
+    ],
+    correctOption: 1,
+    answer: "Sharding partitions data across multiple database instances. Each shard holds a subset of rows (e.g., users A-M on shard 1, N-Z on shard 2). Strategies: Hash-based (hash of key mod N), Range-based (date ranges), Directory-based (lookup table). Benefits: horizontal scaling, reduced query load per shard. Challenges: cross-shard queries, rebalancing, hotspots.",
+    tips: "Discuss the difficulty of joins across shards and how consistent hashing helps with rebalancing."
+  },
+  {
+    id: 249, topic: "System Design", difficulty: "medium",
+    scenario: "What is the CQRS pattern?",
+    options: [
+      "A caching strategy that queries Redis before the database",
+      "Command Query Responsibility Segregation — separate the read model (optimized for queries) from the write model (optimized for commands)",
+      "A pattern for compressing queries to reduce network bandwidth",
+      "A database replication strategy for disaster recovery"
+    ],
+    correctOption: 1,
+    answer: "CQRS separates the write path (commands that change state) from the read path (queries that return data). The write model is normalized for consistency; the read model is denormalized for fast queries. Often paired with Event Sourcing — writes produce events, a projector builds read-optimized views. Benefits: independent scaling of reads vs writes, optimized data models for each. Trade-off: eventual consistency between models.",
+    tips: "Not every system needs CQRS — it adds complexity. Use it when read and write patterns differ dramatically."
+  },
+  {
+    id: 250, topic: "System Design", difficulty: "medium",
+    scenario: "What is a Circuit Breaker pattern?",
+    options: [
+      "A hardware device that prevents electrical overload in data centers",
+      "A design pattern that prevents cascading failures by stopping calls to a failing service after a threshold, allowing it time to recover",
+      "A load balancer algorithm that distributes traffic in a circular pattern",
+      "A database lock mechanism that prevents concurrent writes"
+    ],
+    correctOption: 1,
+    answer: "Three states: Closed (normal — requests pass through, failures counted), Open (tripped — requests fail immediately without calling the service, returns fallback), Half-Open (after timeout, allows a few test requests to check recovery). Prevents cascading failures when a downstream service is slow/down. Libraries: Resilience4j (Java), Hystrix (deprecated), Polly (.NET).",
+    tips: "Pair with retries (with exponential backoff) and bulkheads for a complete resilience strategy."
+  },
+  {
+    id: 251, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a distributed task scheduler like cron at scale?",
+    options: [
+      "Run a single cron server and restart it if it fails",
+      "Use a coordination service (ZooKeeper/etcd) for leader election, a persistent job store, and worker nodes that pull tasks — ensuring exactly-once execution with distributed locks",
+      "Let each server run its own cron independently",
+      "Use sleep() loops in application code to schedule tasks"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Job store — DB/Redis storing job definitions, schedules, and state, (2) Scheduler service — leader-elected (via ZooKeeper/etcd) node that evaluates cron expressions and enqueues due jobs, (3) Message queue — decouples scheduling from execution, (4) Worker pool — pulls jobs, executes, reports results, (5) Distributed lock — prevents duplicate execution across workers. Ensure idempotency, support retries with dead letter queues, and provide a dashboard for monitoring.",
+    tips: "Discuss exactly-once vs at-least-once semantics and how distributed locks (Redis SETNX) prevent duplicate runs."
+  },
+  {
+    id: 252, topic: "System Design", difficulty: "easy",
+    scenario: "What is an API Gateway?",
+    options: [
+      "A database proxy that optimizes SQL queries",
+      "A single entry point for all client requests that handles routing, authentication, rate limiting, and load balancing before forwarding to backend microservices",
+      "A tool for generating API documentation automatically",
+      "A service that converts REST APIs to GraphQL"
+    ],
+    correctOption: 1,
+    answer: "An API Gateway sits between clients and microservices. It handles: request routing (path-based to correct service), authentication/authorization (JWT validation), rate limiting, request/response transformation, caching, load balancing, SSL termination, and logging. Examples: Kong, AWS API Gateway, NGINX, Zuul. Prevents clients from needing to know about individual service locations.",
+    tips: "Discuss the BFF (Backend For Frontend) pattern where different gateways serve web vs mobile clients."
+  },
+  {
+    id: 253, topic: "System Design", difficulty: "medium",
+    scenario: "What is Consistent Hashing and why is it used?",
+    options: [
+      "A hashing algorithm that always produces the same hash for the same input",
+      "A technique where nodes and keys are mapped to a hash ring, so adding/removing nodes only redistributes a minimal number of keys — crucial for distributed caches and databases",
+      "A method to ensure all database rows have unique hash values",
+      "A consensus algorithm used by blockchain networks"
+    ],
+    correctOption: 1,
+    answer: "In consistent hashing, both servers and keys are mapped to positions on a circular hash ring. A key is assigned to the nearest server clockwise on the ring. When a server is added/removed, only keys between the new/removed node and its predecessor are redistributed — not all keys. Virtual nodes (multiple positions per server) ensure even distribution. Used by: DynamoDB, Cassandra, Memcached, CDNs.",
+    tips: "Without consistent hashing, adding a server to a cluster would remap almost all keys (hash(key) mod N changes)."
+  },
+  {
+    id: 254, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a search autocomplete / typeahead system?",
+    options: [
+      "Run a SQL LIKE query against the full database on every keystroke",
+      "Use a Trie data structure (or prefix index) with popularity ranking, cached in memory, updated asynchronously from search analytics",
+      "Send the partial query to a third-party search engine API",
+      "Pre-generate all possible completions and store them as static files"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Trie (prefix tree) — stores search phrases, each node has top-K suggestions by popularity, (2) Data collection — aggregate search queries hourly/daily to compute popularity, (3) Trie builder — offline job rebuilds trie from aggregated data, (4) Cache layer — CDN/Redis caches top suggestions for common prefixes, (5) API — returns top 5-10 suggestions within 100ms. Optimizations: only query after 2+ characters, debounce (200ms), filter offensive content.",
+    tips: "Discuss the trade-off between real-time freshness (trending searches) and pre-computed suggestions."
+  },
+  {
+    id: 255, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Saga pattern for distributed transactions?",
+    options: [
+      "A Norse mythology-inspired naming convention for microservices",
+      "A pattern that manages distributed transactions as a sequence of local transactions, each with a compensating action for rollback — avoiding two-phase commit",
+      "A logging pattern that records all database transactions to a saga log file",
+      "A UI pattern for multi-step form wizards"
+    ],
+    correctOption: 1,
+    answer: "A Saga is a sequence of local transactions where each step publishes an event triggering the next. If a step fails, compensating transactions undo previous steps (e.g., cancel order → refund payment → restore inventory). Two types: Choreography (services listen to events, no central coordinator) and Orchestration (a saga orchestrator tells each service what to do). Avoids distributed locks and two-phase commit.",
+    tips: "Orchestration is easier to debug/monitor. Choreography scales better but is harder to trace. Mention idempotency of compensating actions."
+  },
+  {
+    id: 256, topic: "System Design", difficulty: "easy",
+    scenario: "What is a Message Queue and why use one?",
+    options: [
+      "A type of database that stores messages in a table format",
+      "An async communication mechanism where producers send messages to a queue and consumers process them independently — enabling decoupling, buffering, and resilience",
+      "A real-time chat protocol for inter-service communication",
+      "A network tool that queues and prioritizes TCP packets"
+    ],
+    correctOption: 1,
+    answer: "A message queue (RabbitMQ, SQS, Kafka) sits between services. Producers push messages; consumers pull and process them. Benefits: decoupling (producer doesn't wait for consumer), buffering (handles traffic spikes), resilience (messages survive consumer crashes), load leveling (consumers process at their own pace). Use cases: order processing, email sending, log aggregation, event streaming.",
+    tips: "Distinguish queues (one consumer per message) from topics/pub-sub (multiple consumers per message)."
+  },
+  {
+    id: 257, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a distributed file storage system like Google Drive?",
+    options: [
+      "Store all files on a single high-capacity NAS server with RAID",
+      "Chunk files into blocks, replicate across multiple storage nodes, track metadata in a separate service, sync changes via event-driven notifications",
+      "Use a relational database to store file contents as BLOBs",
+      "Mount a shared NFS volume across all application servers"
+    ],
+    correctOption: 1,
+    answer: "Components: (1) Client — watches local folder, detects changes, syncs deltas, (2) Metadata service — stores file tree, permissions, versions, sharing in DB (sharded by user), (3) Block storage — files chunked into 4MB blocks, deduplicated by content hash, stored on distributed storage nodes with 3x replication, (4) Sync service — uses WebSockets to push change notifications to other devices, (5) Notification queue (Kafka) — broadcasts file change events. Optimizations: delta sync (only changed blocks), compression, CDN for shared files.",
+    tips: "Discuss conflict resolution (last-write-wins vs manual merge), versioning, and how deduplication saves storage."
+  },
+  {
+    id: 258, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between Optimistic and Pessimistic Locking?",
+    options: [
+      "Optimistic locking is faster; Pessimistic locking is more accurate",
+      "Optimistic locking allows concurrent access and checks for conflicts at commit time (version/ETag); Pessimistic locking acquires exclusive locks upfront to prevent conflicts",
+      "Optimistic uses row-level locks; Pessimistic uses table-level locks",
+      "They are different names for the same locking mechanism"
+    ],
+    correctOption: 1,
+    answer: "Pessimistic: Lock the resource before reading/writing (SELECT FOR UPDATE). No other transaction can modify it until the lock is released. Guarantees no conflicts but reduces throughput. Optimistic: Allow concurrent access. Each record has a version number/timestamp. On update, check if the version matches — if not, someone else changed it (retry or fail). Higher throughput but requires conflict handling. Use pessimistic for high-contention, optimistic for low-contention scenarios.",
+    tips: "JPA uses @Version for optimistic locking. HTTP uses ETags for the same concept in REST APIs."
+  },
+  {
+    id: 259, topic: "System Design", difficulty: "easy",
+    scenario: "What is a Reverse Proxy?",
+    options: [
+      "A proxy that reverses the order of HTTP request headers",
+      "A server that sits in front of backend servers, forwarding client requests to them — providing load balancing, SSL termination, caching, and security",
+      "A client-side tool that routes browser traffic through a VPN",
+      "A database proxy that reverses query results for pagination"
+    ],
+    correctOption: 1,
+    answer: "A reverse proxy sits between clients and backend servers. Clients send requests to the proxy, which forwards them to the appropriate backend. Benefits: load balancing, SSL termination (handle HTTPS at proxy, HTTP internally), caching static content, compression, security (hides backend server IPs), rate limiting. Examples: NGINX, HAProxy, Traefik, AWS ALB.",
+    tips: "Forward proxy acts on behalf of the client (hiding client). Reverse proxy acts on behalf of the server (hiding server)."
+  },
+  {
+    id: 260, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a real-time leaderboard for a game with millions of players?",
+    options: [
+      "Query the database with ORDER BY score DESC LIMIT 100 on every request",
+      "Use a Redis Sorted Set (ZADD/ZRANGE) for O(log N) updates and O(log N + M) range queries, with periodic persistence to a database",
+      "Maintain a sorted array in application memory and binary search for updates",
+      "Use a blockchain to ensure leaderboard integrity"
+    ],
+    correctOption: 1,
+    answer: "Redis Sorted Sets are ideal: ZADD updates a player's score in O(log N), ZREVRANGE gets top-K in O(log N + K), ZREVRANK gets a player's rank in O(log N). For millions of players, Redis handles this in-memory with sub-millisecond latency. Persist to DB periodically for durability. For global + friend leaderboards: global = one sorted set, friend = compute on read by fetching friend scores. Sharding: partition by region or game mode if needed.",
+    tips: "Discuss daily/weekly/all-time boards (separate sorted sets with TTL), and how to handle ties (secondary sort by timestamp)."
+  },
 ];
