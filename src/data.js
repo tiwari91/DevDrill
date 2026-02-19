@@ -5450,4 +5450,459 @@ export const INTERVIEW_QUESTIONS = [
     answer: "Based on Amazon's Dynamo paper: (1) Partitioning — consistent hashing with virtual nodes. Each physical node owns multiple ranges on the hash ring. Data automatically redistributed when nodes join/leave. (2) Replication — each key replicated to N nodes (typically 3). Coordinator writes to N replicas. Tunable consistency: W=write quorum, R=read quorum. W+R>N ensures overlap (strong consistency if W=2, R=2, N=3). W=1, R=1 for maximum performance (eventual consistency). (3) Conflict resolution — concurrent writes to different replicas can conflict. Vector clocks: detect conflicts, application resolves (shopping cart merge). LWW (last-writer-wins): simpler, some writes may be lost. (4) Failure handling — sloppy quorum + hinted handoff: if a replica is down, write to next available node with a 'hint'. When the node recovers, hinted data is forwarded. (5) Anti-entropy — Merkle trees: hash tree of key ranges. Compare trees between replicas to find inconsistencies efficiently (O(log N) comparison). (6) Membership — gossip protocol: nodes periodically exchange membership lists. Eventually consistent view of cluster topology. Consistent hashing + gossip = no single point of failure, fully decentralized.",
     tips: "The Dynamo paper (2007) is one of the most important distributed systems papers. DynamoDB, Cassandra, Riak, and Voldemort are all inspired by it. Understanding virtual nodes, vector clocks, and Merkle trees from this paper will help in many system design interviews."
   },
+  {
+    id: 416, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a social media news feed system like Facebook or Twitter?",
+    options: [
+      "Query all friends' posts in real-time when user opens the feed",
+      "Use a hybrid approach: fan-out-on-write for normal users (pre-compute feeds into per-user caches) and fan-out-on-read for celebrity users (fetch at read time) — with ranking service, feed cache, and real-time updates via WebSocket",
+      "Store all posts in a single table sorted by timestamp",
+      "Send push notifications for every new post instead of a feed"
+    ],
+    correctOption: 1,
+    answer: "Fan-out-on-write: when user X posts, push that post to every follower's feed cache (Redis list). Pros: fast reads (O(1) — just read from cache). Cons: expensive writes for celebrities (millions of followers = millions of cache writes). Fan-out-on-read: when user opens feed, fetch posts from all followed users in real-time. Pros: cheap writes. Cons: slow reads (merge N timelines). Hybrid: fan-out-on-write for users with <10K followers, fan-out-on-read for celebrities. Ranking: ML model scores posts by relevance (engagement prediction, recency, relationship strength). Feed cache: per-user Redis sorted set with top 500 posts. Real-time: WebSocket pushes new posts to online users. Pagination: cursor-based (not offset) for stable scrolling.",
+    tips: "This is one of the most common system design questions. Always mention the fan-out trade-off and the celebrity problem. Twitter switched from fan-out-on-write to a hybrid approach specifically because of celebrities."
+  },
+  {
+    id: 417, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between B-tree and LSM-tree storage engines?",
+    options: [
+      "B-trees are for SQL databases only; LSM-trees are for NoSQL only",
+      "B-trees use in-place updates with page-based storage (optimized for reads), while LSM-trees use append-only writes with periodic compaction (optimized for writes) — each excelling at different workload patterns",
+      "LSM-trees are always faster than B-trees",
+      "B-trees don't support range queries"
+    ],
+    correctOption: 1,
+    answer: "B-tree: data stored in fixed-size pages (4-16KB), organized as a balanced tree. Updates modify pages in-place. Read: traverse tree from root to leaf, O(log N). Write: find page, update in-place (may trigger page split). Pros: predictable read performance, efficient range scans. Cons: write amplification from page rewrites, fragmentation. LSM-tree: writes go to in-memory memtable (sorted), flushed to disk as immutable SSTable when full. Reads check memtable first, then SSTables (use bloom filters to skip). Compaction merges SSTables periodically. Pros: sequential writes (much faster than random I/O), better write throughput. Cons: compaction overhead, space amplification, less predictable read latency. B-tree: PostgreSQL, MySQL InnoDB. LSM-tree: RocksDB, LevelDB, Cassandra, HBase.",
+    tips: "B-tree = read-optimized (OLTP with balanced reads/writes). LSM-tree = write-optimized (heavy write workloads, time-series, logs). Know when to pick each."
+  },
+  {
+    id: 418, topic: "System Design", difficulty: "easy",
+    scenario: "What is an SSTable and how does it relate to LSM-tree storage?",
+    options: [
+      "SSTable is a SQL table stored on an SSD",
+      "An SSTable (Sorted String Table) is an immutable on-disk file of key-value pairs sorted by key — it's the persistent storage format used by LSM-trees when memtable data is flushed to disk",
+      "SSTable is a caching format for Redis",
+      "SSTable stands for Secure Socket Table for encrypted storage"
+    ],
+    correctOption: 1,
+    answer: "SSTable (Sorted String Table): immutable file containing key-value pairs sorted by key. Structure: data blocks (sorted key-value pairs), index block (sparse index of keys to block offsets), bloom filter (quickly test if a key might exist), metadata. In LSM-tree flow: (1) writes go to memtable (in-memory sorted structure, usually red-black tree or skip list), (2) when memtable is full, flush to disk as SSTable, (3) multiple SSTables accumulate, (4) compaction merges overlapping SSTables into fewer, larger ones. Benefits of sorting: enables efficient range queries, binary search for point lookups, and merge-sort during compaction. Immutability simplifies concurrency (no locks needed for reads).",
+    tips: "SSTables are used by Google Bigtable, Apache Cassandra, RocksDB, and LevelDB. The key insight: sorted + immutable = efficient merging (like merge sort)."
+  },
+  {
+    id: 419, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a food delivery system like Uber Eats or DoorDash?",
+    options: [
+      "Simple CRUD app with a list of restaurants and orders",
+      "Microservices architecture with: restaurant service (menus, availability), order service (placement, state machine), dispatch service (driver matching using geospatial index), real-time tracking (WebSocket + driver GPS), payment service (pre-auth + capture), and ETA prediction (ML model using traffic, distance, restaurant prep time)",
+      "Single monolithic app with a relational database",
+      "Peer-to-peer system where customers contact restaurants directly"
+    ],
+    correctOption: 1,
+    answer: "Key services: (1) Restaurant Service — menus, pricing, hours, availability radius. Geospatial index (PostGIS/Redis GEO) for nearby restaurants. (2) Order Service — state machine: placed → accepted → preparing → ready → picked_up → delivered. Saga pattern for coordination. (3) Dispatch Service — match driver to order using: proximity (geohash), driver rating, current load, route efficiency. Batching: assign multiple orders to one driver if restaurants/destinations are close. (4) Tracking — driver app sends GPS every 5-10s via WebSocket. Store in Redis for real-time queries. Broadcast to customer via WebSocket. (5) ETA — ML model: historical prep times per restaurant, traffic patterns, distance, weather. Update dynamically during delivery. (6) Payment — pre-authorize at order time, capture after delivery. Handle tips, split payments, refunds. (7) Rating — bidirectional (customer rates driver + restaurant, driver rates customer). Scale challenges: peak hours (dinner rush), geographic partitioning, surge pricing.",
+    tips: "Focus on the dispatch algorithm and real-time tracking — these are the hardest parts. Mention the batching optimization (one driver, multiple orders) as it's a key differentiator for profitability."
+  },
+  {
+    id: 420, topic: "System Design", difficulty: "easy",
+    scenario: "What is a memtable in the context of database storage engines?",
+    options: [
+      "A memtable is an in-memory sorted data structure (typically a red-black tree or skip list) that serves as a write buffer in LSM-tree storage engines — writes go here first before being flushed to disk as SSTables",
+      "A memtable is a database table that only exists in memory",
+      "A memtable is the page cache used by B-tree databases",
+      "A memtable is a distributed hash table for caching"
+    ],
+    correctOption: 0,
+    answer: "In LSM-tree engines, every write first goes to the memtable (in-memory). The memtable keeps entries sorted by key, enabling efficient lookups and range scans. When the memtable reaches a size threshold (typically 64MB-256MB), it becomes immutable and a new memtable is created for new writes. The immutable memtable is then flushed to disk as an SSTable in the background. During reads, the memtable is checked first (most recent data), then SSTables on disk. A Write-Ahead Log (WAL) ensures durability — writes are logged to WAL before memtable, so data can be recovered if the process crashes before flushing. Common implementations: skip list (RocksDB, LevelDB) or red-black tree.",
+    tips: "The memtable is why LSM-trees have fast writes — everything is an append to an in-memory sorted structure. The WAL ensures you don't lose data between flushes."
+  },
+  {
+    id: 421, topic: "System Design", difficulty: "medium",
+    scenario: "What are compaction strategies in LSM-tree storage engines and how do they differ?",
+    options: [
+      "Compaction is just deleting old data",
+      "There is only one compaction strategy — merge everything into one file",
+      "Size-tiered compaction groups similarly-sized SSTables and merges them, while leveled compaction organizes SSTables into levels with size ratios — size-tiered favors write throughput, leveled favors read performance and space efficiency",
+      "Compaction only happens during database shutdown"
+    ],
+    correctOption: 2,
+    answer: "Size-Tiered Compaction (STCS): group SSTables of similar size, merge when count exceeds threshold (e.g., 4 similar-sized SSTables → merge into 1 larger). Pros: high write throughput, simple. Cons: high space amplification (temporary 2x storage during compaction), more SSTables to check during reads. Leveled Compaction (LCS): SSTables organized into levels (L0, L1, L2...). Each level is 10x larger than previous. L0 SSTables overlap; L1+ SSTables have non-overlapping key ranges. Compaction: pick an SSTable from Ln, merge with overlapping SSTables in Ln+1. Pros: bounded space amplification (10% overhead), fewer SSTables per read, predictable read latency. Cons: higher write amplification (each key may be rewritten through multiple levels). FIFO Compaction: simply delete oldest SSTables when total size exceeds threshold. Used for time-series data where old data expires.",
+    tips: "Cassandra defaults to STCS, RocksDB to LCS. Choose STCS for write-heavy workloads, LCS for read-heavy with space constraints. Know the amplification trade-offs: write vs read vs space."
+  },
+  {
+    id: 422, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design an elevator system for a large building?",
+    options: [
+      "First-come-first-served — elevators respond to the oldest request first",
+      "Use a scheduling algorithm that considers: current direction (continue in same direction to serve all requests), destination dispatch (group passengers going to same floor), zone allocation (assign elevator groups to floor ranges), and load balancing — minimizing average wait time and travel time",
+      "Random assignment — any elevator handles any request",
+      "One elevator per floor so no scheduling is needed"
+    ],
+    correctOption: 1,
+    answer: "Classic algorithms: (1) SCAN (elevator algorithm): move in one direction, serve all requests in that direction, then reverse. Like a disk head. Simple, fair, but not optimal. (2) LOOK: like SCAN but reverses when no more requests in current direction (doesn't go to top/bottom needlessly). (3) Destination dispatch: passengers enter destination floor at lobby (not just up/down). System groups passengers going to same/nearby floors into same elevator. Reduces stops per trip by 30-50%. Used in modern high-rises. Design considerations: (1) Zone allocation: in a 50-floor building, elevators 1-4 serve floors 1-25, elevators 5-8 serve 25-50. Reduces unnecessary stops. (2) Express mode: dedicated elevators for lobby-to-sky-lobby express (skip intermediate floors). (3) Rush hour handling: morning = most requests going up from lobby. Bias idle elevators to lobby. Evening = reverse. (4) Load balancing: distribute requests across elevators to minimize max wait time. (5) Emergency: fire mode, earthquake mode, power failure fallback.",
+    tips: "This is an OOP design question that can also be asked as system design. Focus on the scheduling algorithm and the state machine for each elevator (idle, moving up, moving down, door open)."
+  },
+  {
+    id: 423, topic: "System Design", difficulty: "easy",
+    scenario: "What is a bloom filter and how is it used in databases?",
+    options: [
+      "A bloom filter is a type of B-tree index",
+      "A bloom filter is a SQL query optimizer",
+      "A bloom filter is a probabilistic data structure that can tell you 'definitely not in set' or 'possibly in set' — used in databases to avoid unnecessary disk reads by quickly checking if a key might exist in an SSTable",
+      "A bloom filter is a data compression algorithm"
+    ],
+    correctOption: 2,
+    answer: "A bloom filter is a bit array with multiple hash functions. To add a key: hash it with K hash functions, set those K bit positions to 1. To check a key: hash it with same K functions, check if ALL bit positions are 1. If any bit is 0 → key definitely NOT in set (no false negatives). If all bits are 1 → key MIGHT be in set (possible false positive). False positive rate depends on: bit array size, number of hash functions, number of elements. Typical: 1% FP rate with 10 bits per element. In databases: LSM-tree reads must check multiple SSTables. Before reading an SSTable from disk, check its bloom filter. If bloom filter says 'no', skip that SSTable entirely (save a disk read). This dramatically improves point lookup performance. Used by: Cassandra, RocksDB, HBase, LevelDB.",
+    tips: "Bloom filters are space-efficient (10 bits per element vs storing the actual key). The key property: no false negatives, possible false positives. This makes them perfect for 'should I bother looking here?' checks."
+  },
+  {
+    id: 424, topic: "System Design", difficulty: "medium",
+    scenario: "What is the Raft consensus algorithm and how does it achieve distributed consensus?",
+    options: [
+      "Raft uses a lottery system where any node can randomly become leader",
+      "Raft divides consensus into leader election, log replication, and safety — a leader is elected by majority vote, the leader replicates log entries to followers, and committed entries are guaranteed to be present on all future leaders",
+      "Raft requires all nodes to agree before committing any write",
+      "Raft is the same as two-phase commit"
+    ],
+    correctOption: 1,
+    answer: "Raft has three roles: leader, follower, candidate. (1) Leader election: followers have election timeout (150-300ms random). If no heartbeat from leader, follower becomes candidate, increments term, votes for self, requests votes from others. Majority vote wins. Random timeouts prevent split votes. (2) Log replication: leader receives client writes, appends to its log, sends AppendEntries RPCs to followers. When majority acknowledge, entry is committed. Leader notifies followers of committed entries. (3) Safety: only candidates with all committed entries can win election (voters reject candidates with shorter/older logs). This guarantees committed entries survive leader changes. Key properties: at most one leader per term, leader's log is always correct (leader never overwrites its own entries), committed entries are durable. Used by: etcd, CockroachDB, TiKV, Consul.",
+    tips: "Raft was designed to be understandable (unlike Paxos). The key insight: randomized election timeouts prevent most split votes. In interviews, walk through a leader failure scenario step by step."
+  },
+  {
+    id: 425, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a ride-sharing dispatch system like Uber or Lyft?",
+    options: [
+      "Assign the closest driver to each rider request",
+      "Use a geospatial matching system with: real-time driver location indexing (geohash/S2 cells), supply-demand pricing (surge), batched matching algorithm (Hungarian method for optimal global assignment), ETA prediction, and driver-rider scoring for match quality",
+      "Let drivers accept ride requests manually from a list",
+      "Pre-assign fixed routes like a bus system"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Location service: drivers send GPS every 4s. Store in geospatial index (S2 cells or geohash in Redis). Query: find all drivers within radius of rider. (2) Matching: naive = closest driver. Better = batched matching: collect requests and available drivers in a time window (2-5s), solve assignment problem to minimize total wait time (Hungarian algorithm). Consider: driver rating, car type, ETA, acceptance probability. (3) ETA prediction: ML model using road network graph (Dijkstra/A*), real-time traffic, historical patterns, weather. Update every few seconds during ride. (4) Surge pricing: divide city into hexagonal cells. If demand/supply ratio > threshold, increase price (multiplier). Price elasticity model to find optimal multiplier. (5) Dispatch state machine: request → matching → driver_accepted → arriving → trip_started → trip_completed. Handle timeouts at each stage. (6) Scale: partition by city/region, millions of location updates per second, global optimization is NP-hard so use heuristics.",
+    tips: "Uber uses H3 (hexagonal hierarchical geospatial indexing) for spatial partitioning. The key architectural insight: batch matching over a time window gives globally better assignments than greedy closest-driver matching."
+  },
+  {
+    id: 426, topic: "System Design", difficulty: "easy",
+    scenario: "What is a skip list and where is it used?",
+    options: [
+      "A skip list is a linked list that skips every other element",
+      "A skip list is a probabilistic data structure with multiple layers of linked lists that provides O(log n) search, insert, and delete — used as the memtable implementation in databases like Redis and LevelDB",
+      "A skip list is an algorithm for skipping cache levels",
+      "A skip list is a data structure only used for sorting"
+    ],
+    correctOption: 1,
+    answer: "A skip list is a layered linked list where higher layers skip over elements for faster traversal. Bottom layer (L0): regular sorted linked list with all elements. Layer L1: subset of elements (each element promoted with 50% probability). Layer L2: subset of L1 elements. And so on. Search: start from top layer, move right until next element is too large, drop down one layer, repeat. Average O(log n) operations. Insert: insert at bottom, flip coin to decide whether to promote to each higher layer. Benefits over balanced BSTs: simpler to implement, no rebalancing needed, lock-free concurrent implementations are easier. Used in: Redis sorted sets (zset), LevelDB/RocksDB memtable, Apache Lucene. Compared to red-black trees: similar performance, but skip lists are easier to implement concurrently.",
+    tips: "Redis uses skip lists for sorted sets because they're simpler than balanced BSTs and support efficient range queries. In interviews, drawing the multi-layer structure makes it easy to explain."
+  },
+  {
+    id: 427, topic: "System Design", difficulty: "medium",
+    scenario: "What is MVCC (Multi-Version Concurrency Control) and how does it work in databases?",
+    options: [
+      "MVCC locks all rows during a transaction to prevent concurrent access",
+      "MVCC stands for Multiple Virtual CPU Cores, a database scaling technique",
+      "MVCC keeps multiple versions of each row, allowing readers to see a consistent snapshot without blocking writers — each transaction sees the database as it was at the transaction's start time",
+      "MVCC is only used in NoSQL databases"
+    ],
+    correctOption: 2,
+    answer: "MVCC: instead of overwriting data, create a new version. Each row has: creation timestamp (or transaction ID) and deletion timestamp. Read: transaction sees only versions visible at its snapshot time (created before snapshot, not yet deleted at snapshot). Write: create new version with current transaction ID, mark old version as deleted. Benefits: readers never block writers, writers never block readers. Only writer-writer conflicts need resolution. Implementation in PostgreSQL: each row has xmin (creating transaction) and xmax (deleting transaction). VACUUM cleans up old versions no longer visible to any transaction. In MySQL InnoDB: undo log stores old versions. Read view determines which versions are visible. Isolation levels: Read Committed (new snapshot per statement), Repeatable Read (snapshot at transaction start), Serializable (adds predicate locks). MVCC is used by: PostgreSQL, MySQL InnoDB, Oracle, CockroachDB.",
+    tips: "MVCC is how PostgreSQL and MySQL achieve high concurrency without read locks. The trade-off: storage overhead from old versions (PostgreSQL needs VACUUM, MySQL needs undo log purge)."
+  },
+  {
+    id: 428, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a music streaming service like Spotify?",
+    options: [
+      "Store all songs as files and stream them over HTTP",
+      "Use adaptive bitrate streaming with: CDN-distributed audio files in multiple quality levels, client-side buffer management, offline caching, a recommendation engine using collaborative filtering, and a microservices architecture for playlists, search, social features, and royalty tracking",
+      "Download entire songs before playback",
+      "Use peer-to-peer streaming between users"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Audio storage: songs encoded at multiple bitrates (96/160/320 kbps). Stored in object storage (S3), distributed via CDN for low-latency streaming. (2) Streaming: adaptive bitrate — client starts at low quality, upgrades based on bandwidth. Pre-buffer next song for gapless playback. Byte-range requests for seeking. (3) Offline: encrypted downloads with DRM. License check on app start. (4) Recommendations: collaborative filtering (users who liked X also liked Y), content-based (audio features: tempo, energy, danceability), contextual (time of day, activity, mood). Discovery Weekly: ML model generating personalized playlists. (5) Search: Elasticsearch for songs/artists/albums/playlists. Autocomplete with prefix matching. (6) Social: following artists, shared playlists, listening activity feed. (7) Royalty tracking: every play event → Kafka → royalty calculation pipeline. Pro-rata model (pool divided by total streams) or user-centric model (your subscription goes to artists you listened to). (8) Scale: 100M+ songs, 500M+ users, peak concurrent streams in millions.",
+    tips: "Spotify actually used P2P streaming in its early days (desktop app) but moved to CDN-based. Focus on the recommendation engine — it's their core differentiator and a great talking point."
+  },
+  {
+    id: 429, topic: "System Design", difficulty: "easy",
+    scenario: "What is write amplification in storage engines?",
+    options: [
+      "Write amplification means the database rejects some writes",
+      "Write amplification means data is written to disk multiple times due to the storage engine's internal operations — a single logical write may cause 10-30x more physical I/O, especially in LSM-trees due to compaction",
+      "Write amplification is a technique to speed up writes",
+      "Write amplification only affects SSDs, not HDDs"
+    ],
+    correctOption: 1,
+    answer: "Write amplification (WA) is the ratio of physical bytes written to disk vs. logical bytes written by the application. Example: you write 1KB. With WA of 10, the storage engine writes 10KB to disk. In LSM-trees: a key-value pair is written to WAL (1st write), memtable flush writes to L0 SSTable (2nd write), compaction from L0→L1 (3rd write), L1→L2 (4th write), etc. Each level multiplies writes. Leveled compaction typically has WA of 10-30x. In B-trees: writing a single row may require rewriting an entire 4KB-16KB page (even if the row is 100 bytes), plus WAL. Page splits cause additional writes. Why it matters: (1) SSD wear — SSDs have limited write cycles (write endurance). High WA reduces SSD lifespan. (2) Throughput — disk I/O bandwidth is finite. Higher WA means lower effective write throughput.",
+    tips: "Write amplification is the main downside of LSM-trees. Size-tiered compaction has lower WA than leveled compaction but higher space amplification. It's a three-way trade-off: write amplification, read amplification, space amplification."
+  },
+  {
+    id: 430, topic: "System Design", difficulty: "medium",
+    scenario: "How does the Paxos consensus algorithm work at a high level?",
+    options: [
+      "Paxos uses a leader that dictates all decisions",
+      "Paxos has three roles (proposer, acceptor, learner) and two phases: prepare/promise phase to claim a proposal number, then accept/accepted phase to commit a value — ensuring only one value can be chosen even with concurrent proposals and failures",
+      "Paxos requires unanimous agreement from all nodes",
+      "Paxos is a simpler alternative to Raft"
+    ],
+    correctOption: 1,
+    answer: "Paxos (Leslie Lamport, 1989): Three roles: proposer (proposes values), acceptor (votes on proposals), learner (learns chosen value). Phase 1 (Prepare): proposer picks a unique proposal number N, sends Prepare(N) to majority of acceptors. Acceptor: if N is highest seen, promise to reject proposals < N, return any previously accepted value. Phase 2 (Accept): if proposer gets promises from majority, it sends Accept(N, value). Value is either: a previously accepted value (from Phase 1 responses) or proposer's own value. Acceptor: if N is still highest seen, accept it. Once majority accept, value is chosen. Key properties: safety (only one value chosen), liveness (progress guaranteed if fewer than half of nodes fail). Challenges: complex to implement correctly, livelock possible (two proposers keep preempting each other — solved by Multi-Paxos with stable leader). Multi-Paxos: elect a stable leader, skip Phase 1 for subsequent proposals. This is what production systems use.",
+    tips: "Raft was specifically designed because Paxos is hard to understand and implement. In interviews, it's fine to explain Raft instead of Paxos — but know that Paxos came first and is the theoretical foundation."
+  },
+  {
+    id: 431, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a video conferencing system like Zoom?",
+    options: [
+      "Direct peer-to-peer connections between all participants",
+      "Use a Selective Forwarding Unit (SFU) architecture: each participant sends their stream once to the SFU server, which selectively forwards streams to other participants based on their bandwidth and UI layout — combined with WebRTC for media transport, simulcast for adaptive quality, and SRTP for encryption",
+      "All video goes through a central server that mixes it into a single stream",
+      "Record all video and play it back with a 30-second delay"
+    ],
+    correctOption: 1,
+    answer: "Three architectures: (1) P2P mesh: each participant sends to every other. Works for 2-3 people, but N participants = N*(N-1) streams. Unscalable. (2) MCU (Multipoint Control Unit): server receives all streams, decodes, composites into one video, re-encodes, sends single stream per participant. Pros: low client bandwidth. Cons: extremely CPU-intensive server-side, adds latency, inflexible layout. (3) SFU (Selective Forwarding Unit): server receives one stream per participant, forwards selected streams to others without transcoding. Simulcast: each sender uploads 3 quality levels (high/medium/low). SFU selects quality per receiver based on bandwidth and UI (active speaker gets high, thumbnail gets low). Encryption: SRTP (Secure Real-time Transport Protocol), DTLS key exchange. Signaling: WebSocket for session management (join/leave, mute, screen share). Media: WebRTC (STUN/TURN for NAT traversal, ICE for connection establishment). Scale: sharded by room, regional SFU servers with cascading for global calls.",
+    tips: "SFU is the industry standard for video conferencing (Zoom, Google Meet, Microsoft Teams). The key advantage over MCU: no transcoding means lower latency and less server CPU. Mention simulcast as the adaptive quality mechanism."
+  },
+  {
+    id: 432, topic: "System Design", difficulty: "easy",
+    scenario: "What is the difference between HTTP/2 and HTTP/3?",
+    options: [
+      "HTTP/3 is just HTTP/2 with a different version number",
+      "HTTP/2 uses TCP with multiplexed streams (still suffers from TCP head-of-line blocking), while HTTP/3 uses QUIC over UDP — eliminating head-of-line blocking, reducing connection setup time, and improving performance on lossy networks",
+      "HTTP/3 is slower than HTTP/2 because UDP is unreliable",
+      "HTTP/2 and HTTP/3 both use TCP"
+    ],
+    correctOption: 1,
+    answer: "HTTP/2: runs over TCP. Multiplexes multiple streams over one TCP connection (avoids HTTP/1.1's head-of-line blocking at HTTP level). BUT: TCP treats all bytes as one ordered stream. If one TCP packet is lost, ALL streams are blocked until retransmission (TCP head-of-line blocking). Also: TCP+TLS handshake = 2-3 RTTs before data transfer. HTTP/3: runs over QUIC (built on UDP). QUIC provides: (1) Independent streams — packet loss on stream A doesn't block stream B (true multiplexing). (2) 0-RTT connection establishment for repeat connections (1-RTT for new). (3) Built-in TLS 1.3. (4) Connection migration — switching WiFi to cellular doesn't require new connection (connection identified by ID, not IP:port). (5) Improved congestion control. Adoption: Google (YouTube, Search), Cloudflare, Facebook all support HTTP/3.",
+    tips: "The key selling point of HTTP/3: eliminating head-of-line blocking that TCP causes in HTTP/2. Also mention 0-RTT connection resumption — critical for mobile users who switch networks frequently."
+  },
+  {
+    id: 433, topic: "System Design", difficulty: "medium",
+    scenario: "What is the difference between a data warehouse and a data lake?",
+    options: [
+      "A data warehouse stores structured, processed data in a schema-on-write approach optimized for analytical queries, while a data lake stores raw data in any format using schema-on-read — data warehouses are for known queries, data lakes are for exploration and flexibility",
+      "Data lakes are always in the cloud; data warehouses are always on-premises",
+      "A data lake is just a data warehouse with more storage",
+      "Data warehouses store unstructured data; data lakes store structured data"
+    ],
+    correctOption: 0,
+    answer: "Data warehouse: structured data, transformed before loading (ETL), schema defined upfront (star/snowflake schema), optimized for SQL analytics. Users: business analysts, BI dashboards. Examples: Snowflake, Redshift, BigQuery. Pros: fast queries, data quality enforced, governance. Cons: expensive, rigid schema, slow to ingest new data types. Data lake: raw data in any format (structured, semi-structured, unstructured), loaded as-is (ELT), schema applied at read time. Stored in object storage (S3, ADLS). Users: data scientists, ML engineers. Examples: S3 + Athena, Databricks Delta Lake. Pros: flexible, cheap storage, handles any data type. Cons: can become 'data swamp' without governance, slower queries on raw data. Modern trend: Lakehouse architecture (Delta Lake, Apache Iceberg) — combines data lake flexibility with data warehouse performance (ACID transactions on data lake, query optimization, schema enforcement optional).",
+    tips: "The lakehouse architecture is the modern answer — mention Delta Lake or Apache Iceberg. The key trade-off: schema-on-write (warehouse) guarantees quality but is rigid; schema-on-read (lake) is flexible but can be messy."
+  },
+  {
+    id: 434, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design an online auction system like eBay?",
+    options: [
+      "Simple database table with bid amounts and timestamps",
+      "Event-driven architecture with: real-time bid processing (optimistic locking to handle concurrent bids), auction timer service, proxy bidding (automatic incremental bidding up to max), bid sniping prevention, notification service for outbid alerts, and escrow/payment integration",
+      "Process bids in hourly batches",
+      "Let sellers manually accept bids they like"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Auction service: create/manage listings with start price, reserve price, end time, bid increment. State machine: draft → active → ending_soon → ended → sold/unsold. (2) Bid service: validate bid (> current + increment, user has payment method, not own auction). Optimistic locking: read current_price + version, submit bid with version check, retry on conflict. Under high concurrency, use Redis atomic operations for hot auctions. (3) Proxy bidding: user sets max bid. System automatically bids minimum increment above competitors until max reached. Implemented as: store max bid privately, reveal only what's needed to stay winning. (4) Timer: auction end times managed by scheduled job or delay queue. Soft close: if bid placed in last 5 minutes, extend by 5 minutes (prevents sniping). (5) Notifications: outbid alerts (push + email), ending soon, won/lost via SNS/SQS pipeline. (6) Search: Elasticsearch for auction listings, faceted search (category, price range, location, ending soon). (7) Trust: buyer/seller ratings, fraud detection (shill bidding, bid shielding).",
+    tips: "Concurrency on popular auctions is the main challenge. Focus on how you handle simultaneous bids — optimistic locking with retry, or Redis WATCH/MULTI for atomic bid placement."
+  },
+  {
+    id: 435, topic: "System Design", difficulty: "easy",
+    scenario: "What is WebRTC and what problems does it solve?",
+    options: [
+      "WebRTC is a web framework for building REST APIs",
+      "WebRTC is a database protocol for real-time queries",
+      "WebRTC (Web Real-Time Communication) enables peer-to-peer audio, video, and data transfer directly between browsers without requiring a central server for media relay — used in video calls, screen sharing, and file transfer",
+      "WebRTC only works on mobile devices"
+    ],
+    correctOption: 2,
+    answer: "WebRTC provides: (1) getUserMedia — access camera and microphone. (2) RTCPeerConnection — peer-to-peer audio/video streaming with encryption (SRTP), codec negotiation, adaptive bitrate. (3) RTCDataChannel — peer-to-peer arbitrary data transfer (file sharing, gaming). Connection establishment: requires signaling server (WebSocket) to exchange SDP offers/answers (session descriptions). ICE (Interactive Connectivity Establishment) discovers the best path: direct P2P if possible, STUN server to discover public IP behind NAT, TURN server as relay if P2P fails. NAT traversal: STUN works for ~80% of cases, TURN needed for symmetric NATs. WebRTC is browser-native — no plugins needed. Uses: Google Meet, Discord, Zoom web client, peer-to-peer file sharing. Limitation: P2P doesn't scale for large group calls (need SFU/MCU server).",
+    tips: "WebRTC is P2P for the media stream, but you still need a server for signaling (exchanging connection info). In interviews, always mention the ICE/STUN/TURN stack for NAT traversal."
+  },
+  {
+    id: 436, topic: "System Design", difficulty: "medium",
+    scenario: "What is the star schema and snowflake schema in data warehouse design?",
+    options: [
+      "Star and snowflake schemas are naming conventions with no structural difference",
+      "Star schema has a central fact table surrounded by denormalized dimension tables (one level), while snowflake schema normalizes dimensions into sub-dimensions (multiple levels) — star is simpler and faster for queries, snowflake saves storage and reduces redundancy",
+      "Star schema is for OLTP; snowflake is for OLAP",
+      "Star schema uses graph databases; snowflake uses relational databases"
+    ],
+    correctOption: 1,
+    answer: "Star schema: central fact table (measurements/events) connected to dimension tables (descriptive attributes). Example: sales_fact (amount, quantity, date_id, product_id, store_id) surrounded by dim_date, dim_product, dim_store. Dimensions are denormalized (dim_product has product_name, category, brand all in one table). Query: simple joins, fast (fewer joins). Snowflake schema: dimensions are normalized into sub-tables. dim_product → dim_category → dim_brand (chain of normalized tables). Reduces data redundancy but requires more joins. Star pros: simpler queries, better query performance (fewer joins), easier for BI tools. Snowflake pros: less storage (no redundancy), easier to maintain (update category name in one place). In practice: star schema is more popular because query performance matters more than storage savings in analytical workloads. Modern columnar databases (Redshift, BigQuery) compress well regardless of redundancy.",
+    tips: "Star schema is the default choice for data warehouses — simpler and faster. Snowflake schema is mostly used when dimension tables are very large with significant redundancy. Don't confuse 'snowflake schema' with 'Snowflake' the data warehouse product."
+  },
+  {
+    id: 437, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a hotel reservation system like Booking.com?",
+    options: [
+      "Simple CRUD API with a reservations table",
+      "Use: an availability service with calendar-based inventory (room-nights as atomic units), double-booking prevention via pessimistic locking or compare-and-swap, a pricing engine with dynamic rates, a search service with geospatial and filter-heavy queries, and a booking pipeline with payment pre-authorization and confirmation workflow",
+      "Process reservations in daily batches",
+      "First-come-first-served with no concurrent booking handling"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Inventory service: room-night as atomic unit (room X on date Y). Availability = unbooked room-nights. Prevent double booking: pessimistic lock on room-night row during checkout, or optimistic lock with version check. For high-demand properties, use Redis SETNX on room-night key. (2) Search: complex multi-filter queries (location, dates, price range, amenities, rating, cancellation policy). Elasticsearch for text/geo search, pre-computed availability counts per property per date range. (3) Pricing engine: dynamic pricing based on demand, season, day of week, events, competitor prices. Revenue management system adjusts rates in real-time. (4) Booking flow: search → select → hold (temporary lock, 10-15 min TTL) → payment pre-auth → confirm → generate booking reference. (5) Cancellation: cancellation policies (free until X, partial refund, non-refundable). Handle rebooking and waitlists. (6) Reviews: verified stays only, aggregate ratings, fake review detection. (7) Notifications: confirmation email, reminder before check-in, review request after checkout. Scale: millions of properties, billions of room-nights, handle flash sales (Black Friday deals).",
+    tips: "The double-booking problem is the core challenge — you must prevent two users from booking the same room on the same night. Discuss pessimistic vs optimistic locking trade-offs. Mention the hold/timer pattern to prevent cart abandonment from blocking inventory."
+  },
+  {
+    id: 438, topic: "System Design", difficulty: "easy",
+    scenario: "What is the QUIC protocol and why was it created?",
+    options: [
+      "QUIC is a new version of TCP",
+      "QUIC is a UDP-based transport protocol developed by Google that combines the reliability of TCP with the speed of UDP — providing built-in TLS 1.3, multiplexed streams without head-of-line blocking, and faster connection establishment",
+      "QUIC is a queue management protocol",
+      "QUIC only works on Google Chrome"
+    ],
+    correctOption: 1,
+    answer: "QUIC (Quick UDP Internet Connections): transport protocol built on UDP, designed to replace TCP+TLS for web traffic. Why created: TCP limitations: (1) head-of-line blocking with multiplexed streams, (2) 2-3 RTT handshake (TCP + TLS), (3) ossified in network middleboxes (hard to update TCP protocol). QUIC features: (1) 0-RTT for resumed connections, 1-RTT for new (vs TCP's 3-way + TLS = 2-3 RTTs). (2) Multiplexed streams independently — loss on one stream doesn't block others. (3) TLS 1.3 integrated (always encrypted, no unencrypted mode). (4) Connection migration — identified by connection ID, not IP+port. Switching WiFi to cellular keeps connection alive. (5) Improved loss recovery and congestion control. (6) Built on UDP to bypass middlebox ossification. HTTP/3 = HTTP over QUIC. Adoption: Google services, Cloudflare, Facebook, Akamai.",
+    tips: "QUIC solves three TCP problems: head-of-line blocking, slow connection establishment, and connection breakage on network change. It's the foundation of HTTP/3."
+  },
+  {
+    id: 439, topic: "System Design", difficulty: "medium",
+    scenario: "What is ETL vs ELT and when would you use each?",
+    options: [
+      "ETL and ELT are the same thing with different names",
+      "ETL transforms data before loading into the warehouse (transform in a staging area), while ELT loads raw data first then transforms inside the warehouse — ELT is preferred in modern cloud data warehouses where compute is elastic and cheap",
+      "ETL is for real-time data; ELT is for batch data",
+      "ELT is always faster than ETL"
+    ],
+    correctOption: 1,
+    answer: "ETL (Extract, Transform, Load): extract from sources, transform in a separate processing engine (cleaning, joining, aggregating), load transformed data into warehouse. Traditional approach. Pros: warehouse only stores clean data, good for limited warehouse compute. Cons: transformation is a bottleneck (separate compute), schema changes require pipeline redesign, slow iteration. ELT (Extract, Load, Transform): extract from sources, load raw data into warehouse/lake, transform using the warehouse's own compute (SQL, dbt). Modern approach. Pros: leverage warehouse's elastic compute (Snowflake, BigQuery), faster iteration (transform logic is just SQL), raw data preserved for re-transformation, dbt has made ELT transformation testable and version-controlled. Cons: warehouse compute costs, raw data takes more storage. When ETL: legacy systems, sensitive data that shouldn't be stored raw, limited warehouse compute. When ELT: cloud data warehouses, data exploration needs, ML pipelines needing raw data.",
+    tips: "dbt (data build tool) has made ELT the modern standard. In interviews, mention dbt for the transformation layer in ELT pipelines — it brings software engineering practices (version control, testing, documentation) to SQL transformations."
+  },
+  {
+    id: 440, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a movie ticket booking system like BookMyShow or Fandango?",
+    options: [
+      "Simple form submission to book seats",
+      "Use: real-time seat map with WebSocket updates, temporary seat locking (hold for 8-10 min during checkout), optimistic concurrency for high-demand shows, payment integration with idempotency, and a tiered caching strategy for show listings vs seat availability",
+      "Queue all bookings and process them one at a time",
+      "Allow overbooking and resolve conflicts later"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Show/theater catalog: movie → theaters → showtimes → seat maps. Cached in Redis (rarely changes). (2) Seat selection: visual seat map (React canvas/SVG). Real-time availability via WebSocket — when someone selects/books a seat, all viewers see it update. (3) Seat locking: when user selects seats, temporarily lock them (Redis SETNX with 8-10 min TTL). If user doesn't complete booking, seats auto-release. Prevents: same seats showing available to two users simultaneously. (4) Booking flow: select seats → lock → payment → confirm → unlock held seats, mark as booked. (5) Concurrency: for extremely popular shows (opening night), use queue-based booking (virtual waiting room). Only N users can select seats simultaneously. (6) Payment: pre-authorize before seat lock. Capture on booking confirmation. Handle partial failures (payment succeeds but booking fails → refund). Idempotency keys prevent double charges. (7) Anti-scalping: CAPTCHA, rate limiting per user, booking limits per account, IP-based throttling. (8) Search: by movie (all showtimes across theaters), by theater (all movies), by time (what's playing now/tonight). Elasticsearch with geo-filtering.",
+    tips: "The seat locking mechanism is the core challenge. Discuss the TTL-based temporary lock pattern (Redis SETNX + EXPIRE). This is similar to the flash sale problem but with a visual component (seat map)."
+  },
+  {
+    id: 441, topic: "System Design", difficulty: "easy",
+    scenario: "What is gRPC and how does it differ from REST?",
+    options: [
+      "gRPC is a high-performance RPC framework using Protocol Buffers for serialization and HTTP/2 for transport — offering strongly typed contracts, streaming, and better performance than REST's text-based JSON over HTTP/1.1",
+      "gRPC and REST are identical protocols",
+      "gRPC is only for Google services",
+      "gRPC is slower than REST because of binary encoding overhead"
+    ],
+    correctOption: 0,
+    answer: "gRPC: Remote Procedure Call framework by Google. Uses Protocol Buffers (protobuf) for serialization (binary, compact, schema-defined) and HTTP/2 for transport. REST: architectural style using HTTP methods (GET/POST/PUT/DELETE) with JSON payloads. Key differences: (1) Serialization: protobuf (binary, 3-10x smaller than JSON) vs JSON (text, human-readable). (2) Contract: .proto files define strongly-typed service interfaces (code generation for client/server). REST uses OpenAPI/Swagger (optional). (3) Streaming: gRPC supports server-streaming, client-streaming, and bidirectional streaming natively. REST is request-response only (need WebSocket for streaming). (4) Performance: gRPC is 2-10x faster (binary encoding + HTTP/2 multiplexing). (5) Browser support: REST works everywhere. gRPC needs grpc-web proxy for browser clients. Use gRPC: microservice-to-microservice communication, low-latency requirements, polyglot environments. Use REST: public APIs, browser-facing APIs, simplicity.",
+    tips: "gRPC for internal microservice communication, REST for external/public APIs. This is the most common pattern. Mention protobuf's backward compatibility (add fields without breaking old clients) as a key advantage."
+  },
+  {
+    id: 442, topic: "System Design", difficulty: "medium",
+    scenario: "What is the hexagonal architecture (ports and adapters) pattern?",
+    options: [
+      "An architecture where the application is shaped like a hexagon in the code structure",
+      "Hexagonal architecture isolates core business logic from external concerns (databases, APIs, UI) through ports (interfaces) and adapters (implementations) — the core domain has no dependencies on infrastructure, making it testable and swappable",
+      "A microservices pattern where each service has six endpoints",
+      "A database sharding strategy using hexagonal grid partitions"
+    ],
+    correctOption: 1,
+    answer: "Hexagonal architecture (Alistair Cockburn, 2005): Core domain (inside the hexagon) contains business logic with zero dependencies on external systems. Ports: interfaces defined by the core (e.g., UserRepository, PaymentGateway, NotificationSender). Adapters: implementations that connect ports to external systems (PostgresUserRepository, StripePaymentAdapter, SESNotificationAdapter). Two types of ports: (1) Driving/primary ports (left side): how the outside world calls the application (REST controller, CLI, message consumer). (2) Driven/secondary ports (right side): how the application calls external systems (database, cache, external APIs). Benefits: (1) Testability — mock adapters for unit tests, test core logic without infrastructure. (2) Swappability — switch from Postgres to MySQL by writing a new adapter, core unchanged. (3) Framework independence — core doesn't depend on Spring, Express, etc. Related patterns: Clean Architecture (Robert C. Martin), Onion Architecture — all share the dependency inversion principle (dependencies point inward).",
+    tips: "The key rule: dependencies always point inward (from adapters toward the core). The core never imports from infrastructure packages. In Spring Boot, this means your domain service interfaces live in the domain package, and the JPA implementation lives in an infrastructure package."
+  },
+  {
+    id: 443, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design a dating app matching system like Tinder or Bumble?",
+    options: [
+      "Show random profiles to all users",
+      "Use: a geospatial user index for proximity-based discovery, a recommendation engine that learns from swipe patterns, Elo/Gale-Shapley inspired ranking for match quality, real-time match notification, and anti-abuse measures — all while minimizing bias and optimizing for mutual interest",
+      "Match users alphabetically",
+      "Let users search for specific profiles like a directory"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Profile service: photos (CDN), bio, preferences (age range, distance, gender). (2) Discovery: geospatial index (Redis GEO or PostGIS) to find users within radius. Filter by preferences (age, gender, already swiped). (3) Card stack generation: for each user session, generate a ranked stack of 50-100 profiles. Ranking factors: compatibility score (shared interests, preference match), attractiveness balance (show profiles of similar 'desirability' using an Elo-like score based on swipe ratios), freshness (boost new profiles), diversity (vary profile types). (4) Matching: when both users swipe right, create a match. Real-time notification via WebSocket/push. (5) Scoring: implicit feedback from swipes trains the recommendation model. Features: profile quality (photo count, bio length), behavioral (swipe patterns, message response rate), contextual (time, location). (6) Anti-abuse: photo verification (selfie matching), bot detection (swipe speed patterns), report system, shadow banning. (7) Fairness: prevent echo chambers, ensure diverse exposure, don't create 'have/have-not' dynamics with the scoring system.",
+    tips: "The 'desirability score' is controversial but important to understand. Tinder's Elo-like system was replaced with a more complex ML model. The key insight: you want to show profiles where mutual interest is most likely, not just profiles the user might like."
+  },
+  {
+    id: 444, topic: "System Design", difficulty: "easy",
+    scenario: "What are the layers of the TCP/IP model?",
+    options: [
+      "The TCP/IP model has 4 layers: Application (HTTP, DNS, SMTP), Transport (TCP, UDP), Internet/Network (IP, ICMP), and Link/Network Access (Ethernet, WiFi) — data gets encapsulated at each layer as it moves down the stack",
+      "TCP/IP has 7 layers identical to the OSI model",
+      "TCP/IP only has 2 layers: TCP and IP",
+      "The TCP/IP model has been replaced by a newer model"
+    ],
+    correctOption: 0,
+    answer: "TCP/IP model (4 layers, bottom to top): (1) Link/Network Access: handles physical transmission on the local network segment. Protocols: Ethernet (frames, MAC addresses), WiFi (802.11), ARP (IP to MAC resolution). (2) Internet/Network: handles routing packets across networks. Protocols: IP (addressing, packet forwarding), ICMP (error messages, ping), routing protocols (BGP, OSPF). (3) Transport: end-to-end communication between processes. TCP (reliable, ordered, connection-oriented) and UDP (unreliable, fast, connectionless). Port numbers identify processes. (4) Application: user-facing protocols. HTTP/HTTPS, DNS, SMTP, FTP, SSH, WebSocket. Encapsulation: application data → TCP segment (add port numbers) → IP packet (add IP addresses) → Ethernet frame (add MAC addresses) → physical bits. Each layer adds its own header. OSI model has 7 layers (adds Presentation and Session between Transport and Application), but TCP/IP's 4-layer model is what's actually used in practice.",
+    tips: "Know the 4 layers and one protocol per layer. The most common interview follow-up: 'What happens when you type google.com in a browser?' — walk through each layer (DNS → TCP handshake → HTTP request → render)."
+  },
+  {
+    id: 445, topic: "System Design", difficulty: "medium",
+    scenario: "What is CDC (Change Data Capture) and how is it implemented?",
+    options: [
+      "CDC is a backup strategy for databases",
+      "CDC is only available in NoSQL databases",
+      "CDC captures and streams database changes (inserts, updates, deletes) in real-time to downstream systems — implemented via log-based capture (reading the database's WAL/binlog), enabling event-driven architectures without modifying application code",
+      "CDC stands for Content Delivery Cache"
+    ],
+    correctOption: 2,
+    answer: "CDC approaches: (1) Log-based (preferred): read database's write-ahead log (PostgreSQL WAL, MySQL binlog, MongoDB oplog). Minimal performance impact on source DB (reading a log, not querying tables). Captures ALL changes including deletes. Tools: Debezium (open source, Kafka Connect based), AWS DMS, Maxwell. (2) Query-based: periodically query source tables for changes (using timestamp/version column). Simpler but: misses deletes, creates load on source DB, has latency. (3) Trigger-based: database triggers capture changes to a shadow table. Complete but: significant performance overhead, complex trigger management. Use cases: (1) Event-driven microservices: capture changes from service A's DB, publish as events for service B. (2) Cache invalidation: update Redis when database changes. (3) Search index sync: update Elasticsearch when records change. (4) Data warehouse loading: stream changes to analytics. (5) Audit trail: capture all changes for compliance. Debezium + Kafka is the most popular CDC setup.",
+    tips: "Log-based CDC (Debezium) is the gold standard — it's non-invasive, captures all changes, and preserves ordering. Always mention it over query-based or trigger-based approaches in interviews."
+  },
+  {
+    id: 446, topic: "System Design", difficulty: "hard",
+    scenario: "How would you design an airline booking system?",
+    options: [
+      "A simple search form connected to a database of flights",
+      "Use: a distributed fare search engine with complex pricing rules, inventory management with nested booking classes, PNR (Passenger Name Record) creation, seat assignment, GDS integration, and payment processing with hold-and-capture — handling overbooking strategies and schedule changes",
+      "Partner with airlines to redirect users to their websites",
+      "Cache all flight data and update once daily"
+    ],
+    correctOption: 1,
+    answer: "Architecture: (1) Search: most complex part. Fare rules are extremely complex (advance purchase, min/max stay, blackout dates, combinability). Pre-compute popular routes, on-demand for rare ones. Multi-city/open-jaw itineraries require graph search algorithms. Cache aggressively (prices change every few minutes). (2) Inventory: airlines use booking classes (Y=full economy, B/H/K=discount). Each class has limited seats. Nested availability: selling a Y seat reduces availability of cheaper classes. (3) Booking flow: search → select → create PNR (reservation record with passenger info, itinerary, contact) → seat assignment (optional) → payment (hold fare for 24h, charge at ticketing). (4) GDS integration: most airlines distribute via Global Distribution Systems (Amadeus, Sabre, Travelport). API integration for availability, booking, ticketing. NDC (New Distribution Capability) is the modern alternative. (5) Pricing: fare + taxes + surcharges. Dynamic pricing based on demand, competitor fares, time to departure. Revenue management adjusts class availability. (6) Overbooking: airlines intentionally overbook (5-15%) because ~10% of passengers are no-shows. Statistical model calculates optimal overbooking level. (7) Disruptions: schedule changes, cancellations, re-accommodation.",
+    tips: "Airline systems are among the most complex in tech. The pricing engine alone is a massive design challenge. Focus on the search/pricing complexity and the overbooking strategy — interviewers love the business logic trade-offs."
+  },
+  {
+    id: 447, topic: "System Design", difficulty: "easy",
+    scenario: "What is NAT (Network Address Translation) and why does it exist?",
+    options: [
+      "NAT translates private IP addresses to public IP addresses at the router, allowing multiple devices on a local network to share a single public IP — it was created because IPv4 addresses are limited (only 4.3 billion)",
+      "NAT is a DNS alternative",
+      "NAT encrypts network traffic between two points",
+      "NAT only works with IPv6"
+    ],
+    correctOption: 0,
+    answer: "Problem: IPv4 has ~4.3 billion addresses, not enough for all devices. Solution: NAT allows an entire private network to share one public IP. How it works: (1) Private network uses reserved ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x). (2) Router maintains a translation table: (private_IP:port → public_IP:port). (3) Outgoing: router replaces source IP with public IP, records mapping. (4) Incoming: router looks up mapping, forwards to correct private IP. Types: (1) Static NAT: one-to-one mapping (1 private IP → 1 public IP). (2) Dynamic NAT: pool of public IPs assigned on demand. (3) PAT (Port Address Translation) / NAT overload: many private IPs share one public IP (distinguished by port numbers). Most common. Implications for system design: direct P2P connections are difficult (WebRTC needs STUN/TURN), port forwarding required for hosting servers behind NAT, IPv6 eliminates the need for NAT (128-bit addresses = virtually unlimited).",
+    tips: "NAT is why WebRTC, online gaming, and P2P applications are complex. The key challenge: devices behind NAT can initiate outbound connections but can't easily receive inbound ones. STUN/TURN solve this for WebRTC."
+  },
+  {
+    id: 448, topic: "System Design", difficulty: "medium",
+    scenario: "What is domain-driven design (DDD) and how does it apply to microservices?",
+    options: [
+      "DDD is a CSS framework for designing web domains",
+      "DDD is a database design methodology focused on normalization",
+      "DDD structures software around the business domain using bounded contexts, aggregates, and ubiquitous language — bounded contexts naturally map to microservice boundaries, ensuring each service owns a cohesive domain with clear interfaces",
+      "DDD is only for monolithic applications"
+    ],
+    correctOption: 2,
+    answer: "DDD key concepts: (1) Ubiquitous Language: developers and domain experts use the same terminology. 'Order' means the same thing in code and business conversations. (2) Bounded Context: a boundary within which a domain model is consistent. 'Customer' in billing context (payment info, invoices) differs from 'Customer' in support context (tickets, SLA). Each bounded context has its own model. (3) Aggregate: cluster of entities treated as a unit for data changes. Order aggregate = Order + OrderLines + ShippingInfo. Consistency enforced within aggregate boundaries. (4) Aggregate Root: the entry point to an aggregate (Order is the root; you don't modify OrderLine directly). (5) Domain Events: significant occurrences (OrderPlaced, PaymentReceived). Enable loose coupling between bounded contexts. Mapping to microservices: each bounded context → one microservice. Communication between contexts via domain events (async messaging) or API calls. Anti-corruption layer: adapter between contexts to translate models. Strategic DDD: context mapping shows relationships between bounded contexts (shared kernel, customer-supplier, conformist, etc.).",
+    tips: "DDD is the best tool for identifying microservice boundaries. If two concepts share the same language and change together, they belong in the same service. If 'Customer' means different things in different contexts, they should be separate services."
+  },
+  {
+    id: 449, topic: "System Design", difficulty: "hard",
+    scenario: "What is Byzantine Fault Tolerance and when is it needed?",
+    options: [
+      "Byzantine faults only occur in very old computer systems",
+      "Byzantine Fault Tolerance (BFT) handles scenarios where nodes can behave arbitrarily (lying, sending conflicting messages, colluding) — requiring 3f+1 nodes to tolerate f Byzantine faults, making it much more expensive than crash fault tolerance but essential for untrusted environments like blockchain",
+      "Byzantine faults are the same as network partitions",
+      "All distributed systems need BFT to function correctly"
+    ],
+    correctOption: 1,
+    answer: "Byzantine Generals Problem (Lamport, 1982): generals must agree on attack/retreat, but some may be traitors sending conflicting messages. Byzantine fault: a node behaves arbitrarily — crash, send wrong data, send different values to different peers, collude with other faulty nodes. Crash fault: node simply stops (detectable). Byzantine fault: node may actively deceive (much harder). BFT requires 3f+1 nodes to tolerate f faults (vs 2f+1 for crash faults). PBFT (Practical BFT, Castro-Liskov 1999): three phases — pre-prepare, prepare, commit. O(n²) message complexity. Tolerates f < n/3 faulty nodes. When needed: blockchain/cryptocurrency (untrusted participants), financial systems with regulatory requirements, aerospace/military (hardware faults causing wrong outputs), multi-party computation. When NOT needed: traditional distributed systems (internal services) — use Raft/Paxos (crash fault tolerance). BFT is much more expensive (more nodes, more messages), only justified when you can't trust all participants.",
+    tips: "Most system design interviews don't require BFT — Raft/Paxos handle crash faults which are the common case for internal systems. Only mention BFT if the question involves untrusted participants (blockchain, cross-organization systems)."
+  },
+  {
+    id: 450, topic: "System Design", difficulty: "easy",
+    scenario: "What is the difference between anycast and unicast routing?",
+    options: [
+      "Anycast and unicast are the same thing",
+      "Unicast routes packets to one specific destination, while anycast routes packets to the nearest node sharing the same IP address — anycast is used by CDNs and DNS to direct users to the closest server geographically",
+      "Anycast sends packets to all nodes simultaneously",
+      "Unicast is for TCP only; anycast is for UDP only"
+    ],
+    correctOption: 1,
+    answer: "Unicast: one sender → one specific receiver. Each IP address identifies exactly one destination. Standard for most internet communication. Anycast: one sender → nearest of many receivers sharing the same IP. Multiple servers worldwide advertise the same IP address via BGP. Network routes packets to the closest one (by network hops, not geographic distance). Use cases: (1) CDN — CloudFlare, AWS CloudFront advertise anycast IPs. User's DNS query reaches nearest PoP automatically. (2) DNS — root DNS servers use anycast (13 root addresses map to hundreds of actual servers worldwide). (3) DDoS mitigation — anycast spreads attack traffic across many servers. Multicast (for comparison): one sender → multiple specific receivers (group membership). Used for IPTV, stock market feeds. Broadcast: one sender → all nodes on network segment. Limited to local network. Anycast works great for stateless protocols (DNS, CDN) but is tricky for stateful connections (TCP) because route changes mid-connection can send packets to a different server.",
+    tips: "Anycast is how Cloudflare serves 300+ cities from the same IP address. It's the simplest form of geographic load balancing — the network does it automatically via BGP routing."
+  },
 ];
